@@ -105,15 +105,8 @@ Python:
 - Предлагай улучшения и дополнительные фичи
 - Если задача неясна — уточни, предложи лучший вариант`;
 
-// ============================================
-// ИЗМЕНЕНИЕ 1: Модель — бери самую мощную
-// ============================================
 const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-const MODEL = 'deepseek-ai/DeepSeek-V3-0324:novita';
-// Альтернативы если не работает:
-// const MODEL = 'Qwen/Qwen2.5-Coder-32B-Instruct:novita';
-// const MODEL = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B:novita';
-// const MODEL = 'meta-llama/Llama-3.3-70B-Instruct:novita';
+const MODEL = 'moonshotai/Kimi-K2.5:novita';
 
 const rateLimits = new Map();
 
@@ -152,10 +145,6 @@ function getCorsHeaders(origin) {
   };
 }
 
-// ============================================
-// ИЗМЕНЕНИЕ 2: callAI — увеличены токены,
-// добавлено автодописывание обрезанного кода
-// ============================================
 async function callAI(apiKey, userMessages, systemPrompt) {
   try {
     const messages = [];
@@ -164,29 +153,23 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       content: String(systemPrompt || DEFAULT_SYSTEM_PROMPT)
     });
 
-    // ============================================
-    // ИЗМЕНЕНИЕ 3: Лимит символов увеличен
-    // ============================================
     for (let i = 0; i < userMessages.length; i++) {
       const m = userMessages[i];
       const role = m.role === 'assistant' ? 'assistant' : 'user';
-      const text = String(m.content || m.text || '').slice(0, 15000); // было 6000
+      const text = String(m.content || m.text || '').slice(0, 6000);
       if (text.trim() !== '') {
         messages.push({ role, content: text });
       }
     }
 
-    // ============================================
-    // ИЗМЕНЕНИЕ 4: max_tokens 16384, temperature 0.4
-    // ============================================
     const requestBody = {
       model: MODEL,
       messages,
-      max_tokens: 16384,   // было 2048 — ВОТ ГЛАВНАЯ ПРИЧИНА ОБРЕЗКИ!
-      temperature: 0.4     // было 0.7 — ниже = точнее следует инструкциям
+      max_tokens: 16384,
+      temperature: 0.3
     };
 
-    let res = await fetch(API_URL, {
+    const res = await fetch(API_URL, {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + apiKey,
@@ -195,10 +178,10 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       body: JSON.stringify(requestBody)
     });
 
-    let responseText = await res.text();
+    const responseText = await res.text();
 
     if (!res.ok) {
-      return { error: true, message: 'Ошибка провайдера (' + res.status + ')', detail: responseText.substring(0, 500) };
+      return { error: true, message: 'Ошибка провайдера (' + res.status + ')', detail: responseText.substring(0, 200) };
     }
 
     let data;
@@ -208,73 +191,12 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       return { error: true, message: 'Ошибка парсинга JSON ответа' };
     }
 
-    let content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
     if (!content || content.trim() === '') {
       return { error: true, message: 'Пустой ответ от модели' };
     }
 
-    // ============================================
-    // ИЗМЕНЕНИЕ 5: Автодописывание если обрезало
-    // ============================================
-    let finishReason = data.choices[0].finish_reason;
-    let attempts = 0;
-
-    while (finishReason === 'length' && attempts < 3) {
-      attempts++;
-
-      // Добавляем то что уже написано и просим продолжить
-      const continueMessages = [...messages];
-      continueMessages.push({ role: 'assistant', content: content });
-      continueMessages.push({
-        role: 'user',
-        content: 'Твой ответ обрезался. Продолжи ТОЧНО с того места где остановился. НЕ повторяй уже написанное. Только продолжение.'
-      });
-
-      const continueBody = {
-        model: MODEL,
-        messages: continueMessages,
-        max_tokens: 16384,
-        temperature: 0.4
-      };
-
-      const contRes = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + apiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(continueBody)
-      });
-
-      if (!contRes.ok) break;
-
-      const contText = await contRes.text();
-      let contData;
-      try {
-        contData = JSON.parse(contText);
-      } catch (e) {
-        break;
-      }
-
-      const contContent = contData.choices && contData.choices[0] && contData.choices[0].message && contData.choices[0].message.content;
-      if (!contContent || contContent.trim() === '') break;
-
-      content += '\n' + contContent;
-      finishReason = contData.choices[0].finish_reason;
-    }
-
-    return {
-      success: true,
-      content,
-      // ============================================
-      // ИЗМЕНЕНИЕ 6: Возвращаем метаинфу
-      // ============================================
-      meta: {
-        finish_reason: finishReason,
-        continued: attempts > 0,
-        continuation_attempts: attempts
-      }
-    };
+    return { success: true, content };
   } catch (e) {
     return { error: true, message: 'Ошибка соединения: ' + e.message };
   }
@@ -288,4 +210,4 @@ module.exports = {
   recordRate,
   getCorsHeaders,
   callAI
-};
+}; 
