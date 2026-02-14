@@ -114,7 +114,7 @@ Python:
 - Если задача неясна — уточни, предложи лучший вариант`;
 
 const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-const MODEL = 'mistralai/Mistral-7B-Instruct-v0.3:novita';
+const MODEL = 'Qwen/Qwen2.5-72B-Instruct:novita';
 
 const rateLimits = new Map();
 
