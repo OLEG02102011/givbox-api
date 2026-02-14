@@ -113,8 +113,8 @@ Python:
 - Предлагай улучшения и дополнительные фичи
 - Если задача неясна — уточни, предложи лучший вариант`;
 
-const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-const MODEL = 'Qwen/Qwen2.5-72B-Instruct:novita';
+const API_URL = 'https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct';
+const MODEL = 'Qwen/Qwen2.5-72B-Instruct';
 
 const rateLimits = new Map();
 
@@ -155,26 +155,28 @@ function getCorsHeaders(origin) {
 
 async function callAI(apiKey, userMessages, systemPrompt) {
   try {
-    const messages = [];
-    messages.push({
-      role: 'system',
-      content: String(systemPrompt || DEFAULT_SYSTEM_PROMPT)
-    });
+    // Формируем промпт в формате ChatML для Qwen
+    let prompt = '<|im_start|>system\n' + String(systemPrompt || DEFAULT_SYSTEM_PROMPT) + '<|im_end|>\n';
 
     for (let i = 0; i < userMessages.length; i++) {
       const m = userMessages[i];
       const role = m.role === 'assistant' ? 'assistant' : 'user';
       const text = String(m.content || m.text || '').slice(0, 6000);
       if (text.trim() !== '') {
-        messages.push({ role, content: text });
+        prompt += '<|im_start|>' + role + '\n' + text + '<|im_end|>\n';
       }
     }
 
+    prompt += '<|im_start|>assistant\n';
+
     const requestBody = {
-      model: MODEL,
-      messages,
-      max_tokens: 16384,
-      temperature: 0.3
+      inputs: prompt,
+      parameters: {
+        max_new_tokens: 4096,
+        temperature: 0.3,
+        return_full_text: false,
+        stop: ['<|im_end|>']
+      }
     };
 
     const res = await fetch(API_URL, {
@@ -189,7 +191,26 @@ async function callAI(apiKey, userMessages, systemPrompt) {
     const responseText = await res.text();
 
     if (!res.ok) {
-      return { error: true, message: 'Ошибка провайдера (' + res.status + ')', detail: responseText.substring(0, 200) };
+      // Если модель загружается — сообщаем пользователю
+      if (res.status === 503) {
+        let waitTime = 30;
+        try {
+          const errData = JSON.parse(responseText);
+          if (errData.estimated_time) {
+            waitTime = Math.ceil(errData.estimated_time);
+          }
+        } catch (e) {}
+        return {
+          error: true,
+          message: 'Модель загружается, подождите ~' + waitTime + ' сек и повторите',
+          retryAfter: waitTime
+        };
+      }
+      return {
+        error: true,
+        message: 'Ошибка провайдера (' + res.status + ')',
+        detail: responseText.substring(0, 200)
+      };
     }
 
     let data;
@@ -199,7 +220,20 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       return { error: true, message: 'Ошибка парсинга JSON ответа' };
     }
 
-    const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    // Serverless API возвращает массив [{generated_text: "..."}]
+    let content = '';
+
+    if (Array.isArray(data) && data[0] && data[0].generated_text) {
+      content = data[0].generated_text;
+    } else if (data.generated_text) {
+      content = data.generated_text;
+    } else if (data.choices && data.choices[0] && data.choices[0].message) {
+      content = data.choices[0].message.content;
+    }
+
+    // Убираем остатки токенов ChatML если есть
+    content = content.replace(/<\|im_end\|>/g, '').replace(/<\|im_start\|>/g, '').trim();
+
     if (!content || content.trim() === '') {
       return { error: true, message: 'Пустой ответ от модели' };
     }
@@ -218,4 +252,4 @@ module.exports = {
   recordRate,
   getCorsHeaders,
   callAI
-}; 
+};
