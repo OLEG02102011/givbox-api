@@ -106,7 +106,7 @@ Python:
 - Если задача неясна — уточни, предложи лучший вариант`;
 
 const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-const MODEL = 'deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct:novita';
+const MODEL = 'meta-llama/Llama-3.1-70B-Instruct:novita';
 
 const rateLimits = new Map();
 
