@@ -113,7 +113,7 @@ Python:
 - Предлагай улучшения и дополнительные фичи
 - Если задача неясна — уточни, предложи лучший вариант`;
 
-const API_URL = 'https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct';
+const API_URL = 'https://router.huggingface.co/v1/chat/completions';
 const MODEL = 'Qwen/Qwen2.5-72B-Instruct';
 
 const rateLimits = new Map();
