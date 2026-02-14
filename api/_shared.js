@@ -1,3 +1,6 @@
+const API_URL = 'https://router.huggingface.co/v1/chat/completions';
+const MODEL = 'Qwen/Qwen2.5-72B-Instruct';
+
 const ALLOWED_ORIGINS = [
   'https://givboxai.pages.dev',
   'http://localhost:3000'
@@ -113,9 +116,6 @@ Python:
 - Предлагай улучшения и дополнительные фичи
 - Если задача неясна — уточни, предложи лучший вариант`;
 
-const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-const MODEL = 'Qwen/Qwen2.5-72B-Instruct';
-
 const rateLimits = new Map();
 
 function checkRate(ip) {
@@ -155,28 +155,28 @@ function getCorsHeaders(origin) {
 
 async function callAI(apiKey, userMessages, systemPrompt) {
   try {
-    // Формируем промпт в формате ChatML для Qwen
-    let prompt = '<|im_start|>system\n' + String(systemPrompt || DEFAULT_SYSTEM_PROMPT) + '<|im_end|>\n';
+    const messages = [];
+
+    messages.push({
+      role: 'system',
+      content: String(systemPrompt || DEFAULT_SYSTEM_PROMPT)
+    });
 
     for (let i = 0; i < userMessages.length; i++) {
       const m = userMessages[i];
       const role = m.role === 'assistant' ? 'assistant' : 'user';
-      const text = String(m.content || m.text || '').slice(0, 6000);
+      const text = String(m.content || m.text || '').slice(0, 15000);
       if (text.trim() !== '') {
-        prompt += '<|im_start|>' + role + '\n' + text + '<|im_end|>\n';
+        messages.push({ role, content: text });
       }
     }
 
-    prompt += '<|im_start|>assistant\n';
-
+    // Chat Completions формат — НЕ inputs/parameters!
     const requestBody = {
-      inputs: prompt,
-      parameters: {
-        max_new_tokens: 4096,
-        temperature: 0.3,
-        return_full_text: false,
-        stop: ['<|im_end|>']
-      }
+      model: MODEL,
+      messages: messages,
+      max_tokens: 16384,
+      temperature: 0.4
     };
 
     const res = await fetch(API_URL, {
@@ -191,7 +191,6 @@ async function callAI(apiKey, userMessages, systemPrompt) {
     const responseText = await res.text();
 
     if (!res.ok) {
-      // Если модель загружается — сообщаем пользователю
       if (res.status === 503) {
         let waitTime = 30;
         try {
@@ -209,7 +208,7 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       return {
         error: true,
         message: 'Ошибка провайдера (' + res.status + ')',
-        detail: responseText.substring(0, 200)
+        detail: responseText.substring(0, 500)
       };
     }
 
@@ -220,25 +219,64 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       return { error: true, message: 'Ошибка парсинга JSON ответа' };
     }
 
-    // Serverless API возвращает массив [{generated_text: "..."}]
+    // Chat Completions возвращает choices[0].message.content
     let content = '';
 
-    if (Array.isArray(data) && data[0] && data[0].generated_text) {
-      content = data[0].generated_text;
-    } else if (data.generated_text) {
-      content = data.generated_text;
-    } else if (data.choices && data.choices[0] && data.choices[0].message) {
+    if (data.choices && data.choices[0] && data.choices[0].message) {
       content = data.choices[0].message.content;
+    } else if (Array.isArray(data) && data[0] && data[0].generated_text) {
+      content = data[0].generated_text;
     }
-
-    // Убираем остатки токенов ChatML если есть
-    content = content.replace(/<\|im_end\|>/g, '').replace(/<\|im_start\|>/g, '').trim();
 
     if (!content || content.trim() === '') {
       return { error: true, message: 'Пустой ответ от модели' };
     }
 
+    // Автодописывание если обрезало
+    let finishReason = data.choices && data.choices[0] && data.choices[0].finish_reason;
+    let attempts = 0;
+
+    while (finishReason === 'length' && attempts < 3) {
+      attempts++;
+
+      const continueMessages = [...messages];
+      continueMessages.push({ role: 'assistant', content: content });
+      continueMessages.push({
+        role: 'user',
+        content: 'Код обрезался. Продолжи ТОЧНО с места обрыва. НЕ повторяй написанное.'
+      });
+
+      const contRes = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: continueMessages,
+          max_tokens: 16384,
+          temperature: 0.4
+        })
+      });
+
+      if (!contRes.ok) break;
+
+      let contData;
+      try {
+        contData = JSON.parse(await contRes.text());
+      } catch (e) { break; }
+
+      const contContent = contData.choices && contData.choices[0] &&
+                          contData.choices[0].message && contData.choices[0].message.content;
+      if (!contContent || contContent.trim() === '') break;
+
+      content += '\n' + contContent;
+      finishReason = contData.choices[0].finish_reason;
+    }
+
     return { success: true, content };
+
   } catch (e) {
     return { error: true, message: 'Ошибка соединения: ' + e.message };
   }
