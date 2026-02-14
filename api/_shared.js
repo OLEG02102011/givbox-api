@@ -106,7 +106,7 @@ Python:
 - Если задача неясна — уточни, предложи лучший вариант`;
 
 const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-const MODEL = 'meta-llama/Llama-3.1-70B-Instruct:novita';
+const MODEL = 'moonshotai/Kimi-K2.5:novita';
 
 const rateLimits = new Map();
 
