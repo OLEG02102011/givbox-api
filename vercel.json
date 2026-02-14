@@ -1,9 +1,3 @@
 {
-  "version": 2,
-  "rewrites": [
-    { "source": "/api", "destination": "/api/index" },
-    { "source": "/api/chat", "destination": "/api/chat" },
-    { "source": "/api/limits", "destination": "/api/limits" },
-    { "source": "/api/debug", "destination": "/api/debug" }
-  ]
+  "version": 2
 }
