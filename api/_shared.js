@@ -1,5 +1,6 @@
-const API_URL = 'https://router.huggingface.co/v1/chat/completions';
-const MODEL = 'Qwen/Qwen2.5-72B-Instruct';
+// by GIV BOX AI
+const API_URL = 'https://api.siliconflow.com/v1/chat/completions';
+const MODEL = 'tencent/Hunyuan-MT-7B';
 
 const ALLOWED_ORIGINS = [
   'https://givboxai.pages.dev',
@@ -171,12 +172,12 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       }
     }
 
-    // Chat Completions формат — НЕ inputs/parameters!
     const requestBody = {
       model: MODEL,
       messages: messages,
-      max_tokens: 16384,
-      temperature: 0.4
+      max_tokens: 8192,
+      temperature: 0.4,
+      stream: false
     };
 
     const res = await fetch(API_URL, {
@@ -219,7 +220,6 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       return { error: true, message: 'Ошибка парсинга JSON ответа' };
     }
 
-    // Chat Completions возвращает choices[0].message.content
     let content = '';
 
     if (data.choices && data.choices[0] && data.choices[0].message) {
@@ -232,7 +232,6 @@ async function callAI(apiKey, userMessages, systemPrompt) {
       return { error: true, message: 'Пустой ответ от модели' };
     }
 
-    // Автодописывание если обрезало
     let finishReason = data.choices && data.choices[0] && data.choices[0].finish_reason;
     let attempts = 0;
 
@@ -255,8 +254,9 @@ async function callAI(apiKey, userMessages, systemPrompt) {
         body: JSON.stringify({
           model: MODEL,
           messages: continueMessages,
-          max_tokens: 16384,
-          temperature: 0.4
+          max_tokens: 8192,
+          temperature: 0.4,
+          stream: false
         })
       });
 
