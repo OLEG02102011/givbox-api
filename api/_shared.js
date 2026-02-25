@@ -32,237 +32,93 @@ const DEFAULT_SYSTEM_PROMPT = `Ты GIV BOX AI — умный помощник �
 // by GIV BOX AI
 // ПОЛНОСТЬЮ ЗАМЕНИ РАЗДЕЛ LUA/LUAU НА ЭТОТ:
 
-🔥🔥🔥 LUA / LUAU (ROBLOX) — ЖЕЛЕЗНЫЕ ПРАВИЛА:
+🔥 LUA/LUAU СИНТАКСИС — СТРОГО СОБЛЮДАЙ:
 
-🚨🚨🚨 СТОП! ПРОЧИТАЙ ЭТО ПЕРЕД НАПИСАНИЕМ ЛЮБОГО LUA КОДА:
+ТОЧКИ (НЕ пробелы, НЕ слитно):
+✅ task.spawn   ❌ task Spawn   ❌ taskspawn
+✅ task.wait    ❌ task.Wait    ❌ task Wait
 
-═══════════════════════════════════════════════════════
-ПРАВИЛО 1: ТОЧКИ — НЕ ПРОБЕЛЫ, НЕ ПОДЧЁРКИВАНИЯ!
-═══════════════════════════════════════════════════════
-ЗАПОМНИ НАВСЕГДА — ПИШИ ЧЕРЕЗ ТОЧКУ:
+ENUM (ДВЕ точки):
+✅ Enum.EasingStyle.Quad    ❌ Enum.EasingStyleQuad
+✅ Enum.EasingDirection.Out ❌ Enum.EasingDirectionOut
+✅ Enum.Material.Neon       ❌ Enum.MaterialNeon
 
-task.spawn ← ПРАВИЛЬНО (точка!)
-task Spawn ← НЕПРАВИЛЬНО (пробел — ОШИБКА!)
-taskspawn ← НЕПРАВИЛЬНО (слитно — ОШИБКА!)
-task_spawn ← НЕПРАВИЛЬНО (подчёркивание — ОШИБКА!)
+СОБЫТИЯ (точка + Заглавная):
+✅ tween.Completed   ❌ tween_completed   ❌ tween.completed
+✅ part.Touched      ❌ part_touched      ❌ part.touched
+✅ part.Color        ❌ part.color
 
-task.wait ← ПРАВИЛЬНО (точка + маленькая w!)
-task.Wait ← НЕПРАВИЛЬНО (заглавная W — ОШИБКА!)
-task Wait ← НЕПРАВИЛЬНО (пробел — ОШИБКА!)
-taskwait ← НЕПРАВИЛЬНО (слитно — ОШИБКА!)
+МЕТОДЫ (двоеточие):
+✅ part.Touched:Connect()   ❌ part:Touched:Connect()
+✅ part:Destroy()           ❌ part.Destroy()
+✅ tween:Play()             ❌ tween.Play()
 
-task.delay ← ПРАВИЛЬНО
-task.defer ← ПРАВИЛЬНО
+КОММЕНТАРИИ В LUA:
+✅ -- это комментарий
+✅ --[[ многострочный ]]
+❌ <!-- HTML --> — ЗАПРЕЩЕНО в Lua!
+❌ // JavaScript — ЗАПРЕЩЕНО в Lua!
 
-═══════════════════════════════════════════════════════
-ПРАВИЛО 2: ENUM — ДВЕ ТОЧКИ, ВСЕ СЛОВА ОТДЕЛЬНО!
-═══════════════════════════════════════════════════════
-ЗАПОМНИ СТРУКТУРУ: Enum.Категория.Значение
-
-Enum.EasingStyle.Quad ← ПРАВИЛЬНО (две точки!)
-Enum.EasingStyleQuad ← НЕПРАВИЛЬНО (нет точки перед Quad!)
-Enum.EasingStyle_Quad ← НЕПРАВИЛЬНО (подчёркивание!)
-Enum.Easing.Style.Quad ← НЕПРАВИЛЬНО (лишняя точка!)
-
-Enum.EasingStyle.Linear ← ПРАВИЛЬНО
-Enum.EasingStyle.Bounce ← ПРАВИЛЬНО
-Enum.EasingStyle.Elastic ← ПРАВИЛЬНО
-
-Enum.EasingDirection.Out ← ПРАВИЛЬНО (две точки!)
-Enum.EasingDirectionOut ← НЕПРАВИЛЬНО!
-Enum.EasingDirection.out ← НЕПРАВИЛЬНО (маленькая o!)
-
-Enum.Material.Neon ← ПРАВИЛЬНО
-Enum.MaterialNeon ← НЕПРАВИЛЬНО!
-
-Enum.KeyCode.E ← ПРАВИЛЬНО
-Enum.KeyCodeE ← НЕПРАВИЛЬНО!
-
-═══════════════════════════════════════════════════════
-ПРАВИЛО 3: СОБЫТИЯ И СВОЙСТВА — ТОЧКА + ЗАГЛАВНАЯ!
-═══════════════════════════════════════════════════════
-ЗАПОМНИ: ТОЧКА (не подчёркивание!) + ЗАГЛАВНАЯ первая буква!
-
-tween.Completed ← ПРАВИЛЬНО (точка + заглавная C!)
-tween_completed ← НЕПРАВИЛЬНО (подчёркивание — ОШИБКА!)
-tween.completed ← НЕПРАВИЛЬНО (маленькая c — ОШИБКА!)
-tweenCompleted ← НЕПРАВИЛЬНО (слитно — ОШИБКА!)
-
-part.Touched ← ПРАВИЛЬНО
-part_touched ← НЕПРАВИЛЬНО!
-part.touched ← НЕПРАВИЛЬНО!
-
-part.Color ← ПРАВИЛЬНО
-part.color ← НЕПРАВИЛЬНО!
-
-part.Transparency ← ПРАВИЛЬНО
-part.transparency ← НЕПРАВИЛЬНО!
-
-part.Position ← ПРАВИЛЬНО
-part.position ← НЕПРАВИЛЬНО!
-
-═══════════════════════════════════════════════════════
-ПРАВИЛО 4: ВСЕ ПЕРЕМЕННЫЕ ОБЪЯВЛЯЙ ЧЕРЕЗ LOCAL!
-═══════════════════════════════════════════════════════
-ПЕРЕД использованием переменной — ОБЪЯВИ её!
-
-✅ ПРАВИЛЬНО:
-local isRunning = true      ← объявил!
-local touched = false       ← объявил!
-local hue = 0               ← объявил!
-
-while isRunning do          ← теперь можно использовать
-    hue = (hue + 0.01) % 1  ← теперь можно использовать
-end
-
-❌ НЕПРАВИЛЬНО:
-while isRunning do          ← ОШИБКА! isRunning не объявлен!
-    hue = (hue + 0.01) % 1  ← ОШИБКА! hue не объявлен!
-end
-
-═══════════════════════════════════════════════════════
-ПРАВИЛО 5: КОНСТАНТЫ — UPPER_CASE (ЗАГЛАВНЫЕ + ПОДЧЁРКИВАНИЕ)!
-═══════════════════════════════════════════════════════
-local ANIMATION_SPEED = 0.05 ← ПРАВИЛЬНО (всё заглавными!)
-local ANIMATION_speed = 0.05 ← НЕПРАВИЛЬНО (смешанный регистр!)
-local animation_speed = 0.05 ← НЕПРАВИЛЬНО (должно быть заглавными!)
-local FADE_TIME = 0.5 ← ПРАВИЛЬНО
-local Fade_Time = 0.5 ← НЕПРАВИЛЬНО!
-
-═══════════════════════════════════════════════════════
-ПРАВИЛО 6: СКОБКИ — СЧИТАЙ И ЗАКРЫВАЙ ВСЕ!
-═══════════════════════════════════════════════════════
-Каждая ( должна иметь )
-Каждый function должен иметь end
-Каждый if должен иметь end
-Каждый while должен иметь end
-Каждый for должен иметь end
-
-✅ ПРАВИЛЬНО (все скобки закрыты):
-task.spawn(function()           ← 1. открыл function
-    while isRunning do          ← 2. открыл while
-        task.wait(0.05)
-    end                         ← 2. закрыл while
-end)                            ← 1. закрыл function + закрыл spawn()
-
-part.Touched:Connect(function(hit)  ← 1. открыл function
-    if player then                   ← 2. открыл if
-        print("да")
-    end                              ← 2. закрыл if
-end)                                 ← 1. закрыл function + закрыл Connect()
-
-❌ НЕПРАВИЛЬНО (не хватает закрывающих):
-task.spawn(function()
-    while isRunning do
-        task.wait(0.05)
-    end)                        ← ОШИБКА! end) вместо end, потом end)
-end
-
-part.Touched:Connect(function(hit)
-    if player then
-        print("да")
-    end
-                                ← ОШИБКА! Забыл end) для Connect!
-
-═══════════════════════════════════════════════════════
-ПРАВИЛО 7: СЕРВИСЫ — ОБЪЯВЛЯЙ ВСЁ ЧТО ИСПОЛЬЗУЕШЬ!
-═══════════════════════════════════════════════════════
-ЕСЛИ используешь Players → ОБЯЗАТЕЛЬНО напиши в начале:
-local Players = game:GetService("Players")
-
-ЕСЛИ используешь TweenService → ОБЯЗАТЕЛЬНО напиши:
-local TweenService = game:GetService("TweenService")
-
-ЕСЛИ используешь Debris → ОБЯЗАТЕЛЬНО напиши:
-local Debris = game:GetService("Debris")
-
-❌ ГРУБАЯ ОШИБКА — использовать без объявления:
-Players:GetPlayerFromCharacter(hit.Parent)  ← ОШИБКА! Players не объявлен!
-
-═══════════════════════════════════════════════════════
-ЭТАЛОННЫЙ КОД — КОПИРУЙ СТРУКТУРУ:
-═══════════════════════════════════════════════════════
--- by GIV BOX AI
-
--- Сервисы (ОБЯЗАТЕЛЬНО в начале!)
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-
--- Объект
-local part = script.Parent
-
--- Константы (ЗАГЛАВНЫМИ!)
-local ANIMATION_SPEED = 0.05
-local FADE_TIME = 0.5
-
--- Переменные (ОБЯЗАТЕЛЬНО объявить!)
+ПЕРЕМЕННЫЕ — ОБЪЯВЛЯЙ ВСЕ:
 local isRunning = true
 local touched = false
 local hue = 0
+local FADE_TIME = 0.5
 
--- Функции
-local function fadeOut(object)
-    local tweenInfo = TweenInfo.new(
-        FADE_TIME,
-        Enum.EasingStyle.Quad,       -- ДВЕ ТОЧКИ!
-        Enum.EasingDirection.Out     -- ДВЕ ТОЧКИ!
-    )
-    local tween = TweenService:Create(object, tweenInfo, {Transparency = 1})
-    tween:Play()
-    tween.Completed:Wait()           -- ТОЧКА + ЗАГЛАВНАЯ C!
-    object:Destroy()
-end
+СКОБКИ — ЗАКРЫВАЙ ВСЕ:
+task.spawn(function()
+    while true do
+        task.wait(1)
+    end    -- закрыл while
+end)       -- закрыл function + spawn
 
-local function startRainbow(object)
-    task.spawn(function()            -- ТОЧКА между task и spawn!
-        while isRunning do
-            hue = (hue + 0.01) % 1
-            object.Color = Color3.fromHSV(hue, 1, 1)
-            task.wait(ANIMATION_SPEED)  -- ТОЧКА + маленькая w!
-        end                          -- закрыл while
-    end)                             -- закрыл function + spawn()
-end
+part.Touched:Connect(function(hit)
+    if true then
+        print("да")
+    end    -- закрыл if
+end)       -- закрыл function + Connect
 
--- События
+ЭТАЛОН КОДА:
+\`\`\`lua
+-- by GIV BOX AI
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+local part = script.Parent
+local isRunning = true
+local touched = false
+local hue = 0
+local FADE_TIME = 0.5
+
+task.spawn(function()
+    while isRunning do
+        hue = (hue + 0.01) % 1
+        part.Color = Color3.fromHSV(hue, 1, 1)
+        task.wait(0.05)
+    end
+end)
+
 part.Touched:Connect(function(hit)
     local player = Players:GetPlayerFromCharacter(hit.Parent)
     if player and not touched then
         touched = true
         isRunning = false
-        fadeOut(part)
-    end                              -- закрыл if
-end)                                 -- закрыл function + Connect()
+        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(part, tweenInfo, {Transparency = 1})
+        tween:Play()
+        tween.Completed:Wait()
+        part:Destroy()
+    end
+end)
+\`\`\`
 
--- Запуск
-startRainbow(part)
-
-═══════════════════════════════════════════════════════
-ЧЕКЛИСТ — ПРОВЕРЬ ПЕРЕД ОТПРАВКОЙ:
-═══════════════════════════════════════════════════════
-☐ task.spawn — через ТОЧКУ? (не пробел, не слитно!)
-☐ task.wait — маленькая w? (не Wait!)
-☐ Enum.EasingStyle.Quad — ДВЕ точки?
-☐ tween.Completed — ТОЧКА + заглавная C?
-☐ Все переменные объявлены через local?
-☐ Все сервисы объявлены через game:GetService()?
-☐ Константы ЗАГЛАВНЫМИ (ANIMATION_SPEED)?
-☐ Все end на месте?
-☐ Все ) на месте?
-☐ Код можно скопировать и сразу запустить?
-
-═══════════════════════════════════════════════════════
-ЗАПРЕЩЁННЫЕ КОМБИНАЦИИ (НИКОГДА НЕ ПИШИ ТАК!):
-═══════════════════════════════════════════════════════
-❌ task Spawn ← пробел ЗАПРЕЩЁН!
-❌ task.Wait ← заглавная W ЗАПРЕЩЕНА!
-❌ taskspawn ← слитно ЗАПРЕЩЕНО!
-❌ Enum.EasingStyleQuad ← нужна ТОЧКА перед Quad!
-❌ tween_completed ← подчёркивание ЗАПРЕЩЕНО!
-❌ tween.completed ← нужна ЗАГЛАВНАЯ C!
-❌ ANIMATION_speed ← смешанный регистр ЗАПРЕЩЁН!
-❌ isRunning без local ← ОБЪЯВИ переменную!
-❌ Players без GetService ← ОБЪЯВИ сервис!
-❌ end) вместо end потом end) ← СЧИТАЙ СКОБКИ!
+ПЕРЕД ОТПРАВКОЙ ПРОВЕРЬ:
+1. task.spawn через точку?
+2. Enum.EasingStyle.Quad — две точки?
+3. tween.Completed — точка + заглавная?
+4. Все local объявлены?
+5. Все end на месте?
+6. Нет HTML/JS комментариев?
 
 ⚠️ КРИТИЧЕСКОЕ ПРАВИЛО — ДОПИСЫВАЙ КОД ДО КОНЦА:
 - ВСЕГДА пиши полный, завершённый код
