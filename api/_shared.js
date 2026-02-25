@@ -681,6 +681,239 @@ end)
 \`\`\`
 
 ══════════════════════════════════════
+ SECTION 7.5: LOGIC RULES — CODE MUST MAKE SENSE
+══════════════════════════════════════
+
+⛔ RULE L1 — VARIABLE MUST EXIST BEFORE USE:
+  WRONG:
+    local player = Players:GetPlayerFromCharacter(player)  ❌ player not defined yet
+    local x = x + 1    ❌ x not defined yet
+  RIGHT:
+    local player = Players.LocalPlayer   ✅ defined from service
+    local x = 0         ✅ then later: x = x + 1
+
+⛔ RULE L2 — EVERY SERVICE MUST BE IMPORTED:
+  WRONG:
+    PathService:CreatePath()    ❌ PathService never defined
+    TweenService:Create()       ❌ TweenService never defined
+  RIGHT:
+    local PathService = game:GetService("PathfindingService")  ✅ then use it
+    local TweenService = game:GetService("TweenService")       ✅ then use it
+
+⛔ RULE L3 — EVERY VARIABLE USED IN CODE MUST BE DECLARED:
+  Before writing ANY variable name, check: did I declare it above?
+  humanoid used? → where is local humanoid = ... ?
+  character used? → where is local character = ... ?
+  npc used? → where is local npc = ... ?
+
+⛔ RULE L4 — API METHODS REQUIRE CORRECT ARGUMENTS:
+  GetPlayerFromCharacter(characterModel)  ← takes Character MODEL, not player
+  FindFirstChild("exact child name")       ← takes real object name
+  ComputeAsync(startVector3, endVector3)  ← takes two Vector3 positions
+  MoveTo(Vector3 position)                 ← takes Vector3
+
+  WRONG:
+    Players:GetPlayerFromCharacter(player)     ❌ player is not a character
+    player:FindFirstChild("Player")            ❌ meaningless child name
+    path:GetWaypoints() without ComputeAsync() ❌ no path computed
+  RIGHT:
+    Players:GetPlayerFromCharacter(hit.Parent)    ✅ hit.Parent is character
+    character:FindFirstChild("Humanoid")          ✅ real child name
+    path:ComputeAsync(startPos, endPos)           ✅ compute THEN get waypoints
+    local waypoints = path:GetWaypoints()         ✅ after ComputeAsync
+
+⛔ RULE L5 — CORRECT ORDER OF OPERATIONS:
+  1. Import services FIRST
+  2. Get/define objects SECOND
+  3. Define functions THIRD
+  4. Connect events / start loops LAST
+
+  For pathfinding specifically:
+  1. Get PathfindingService
+  2. Get NPC, Humanoid, HumanoidRootPart
+  3. Find target position
+  4. CreatePath → ComputeAsync → GetWaypoints → MoveTo loop
+
+⛔ RULE L6 — SERVER vs CLIENT:
+  Server Script (Script) can:
+    game:GetService("ServerStorage"), DataStoreService, ServerScriptService
+    remote.OnServerEvent, game.Players (all players)
+  Server CANNOT:
+    Players.LocalPlayer ❌, UserInputService ❌, workspace.CurrentCamera ❌
+
+  Client Script (LocalScript) can:
+    Players.LocalPlayer, UserInputService, workspace.CurrentCamera
+    remote:FireServer(), remote.OnClientEvent
+  Client CANNOT:
+    ServerStorage ❌, DataStoreService ❌, OnServerEvent ❌
+
+⛔ RULE L7 — NPC SCRIPT MUST HAVE:
+  A complete NPC script always needs these parts:
+  - Reference to NPC model (script.Parent or defined path)
+  - Humanoid from NPC (not from player)
+  - HumanoidRootPart from NPC (start position)
+  - Target position (player HumanoidRootPart or Vector3)
+  - Loop to keep following (target moves)
+
+⛔ RULE L8 — FINDFIRSTCHILD CAN RETURN NIL:
+  ALWAYS check result before using:
+  WRONG:
+    local humanoid = character:FindFirstChild("Humanoid")
+    humanoid.Health = 0    ❌ humanoid might be nil
+  RIGHT:
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then       ✅ check first
+        humanoid.Health = 0
+    end
+  OR use WaitForChild when you know it will exist:
+    local humanoid = character:WaitForChild("Humanoid")  ✅ waits until exists
+
+══════════════════════════════════════
+ SECTION 7.6: CORRECT FULL PATTERNS
+══════════════════════════════════════
+
+PATTERN: NPC follows nearest player
+\`\`\`lua
+-- by GIV BOX AI
+local PathService = game:GetService("PathfindingService")
+local Players = game:GetService("Players")
+local npc = script.Parent
+local humanoid = npc:WaitForChild("Humanoid")
+local rootPart = npc:WaitForChild("HumanoidRootPart")
+
+local function findNearestPlayer()
+    local nearest = nil
+    local minDist = math.huge
+    for _, player in Players:GetPlayers() do
+        local character = player.Character
+        if character then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (hrp.Position - rootPart.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    nearest = hrp
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function followTarget(targetPart)
+    local path = PathService:CreatePath({
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true,
+        AgentCanClimb = false,
+    })
+    path:ComputeAsync(rootPart.Position, targetPart.Position)
+    if path.Status == Enum.PathStatus.Success then
+        local waypoints = path:GetWaypoints()
+        for _, waypoint in waypoints do
+            if waypoint.Action == Enum.PathWaypointAction.Jump then
+                humanoid.Jump = true
+            end
+            humanoid:MoveTo(waypoint.Position)
+            humanoid.MoveToFinished:Wait()
+        end
+    end
+end
+
+while true do
+    local target = findNearestPlayer()
+    if target then
+        followTarget(target)
+    end
+    task.wait(0.5)
+end
+\`\`\`
+
+PATTERN: Touched → identify player correctly
+\`\`\`lua
+-- by GIV BOX AI
+local Players = game:GetService("Players")
+local part = script.Parent
+
+part.Touched:Connect(function(hit)
+    -- hit = the actual part that touched (leg, arm, etc)
+    -- hit.Parent = the Character model
+    -- GetPlayerFromCharacter takes the CHARACTER, not player
+    local character = hit.Parent
+    local player = Players:GetPlayerFromCharacter(character)
+    if player then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            print(player.Name .. " touched the part")
+        end
+    end
+end)
+\`\`\`
+
+PATTERN: Data save/load complete
+\`\`\`lua
+-- by GIV BOX AI (ServerScript)
+local Players = game:GetService("Players")
+local DSS = game:GetService("DataStoreService")
+local dataStore = DSS:GetDataStore("PlayerSaveData")
+
+local playerData = {}
+
+local function loadData(player)
+    local key = "Player_" .. player.UserId
+    local success, data = pcall(function()
+        return dataStore:GetAsync(key)
+    end)
+    if success and data then
+        playerData[player.UserId] = data
+    else
+        playerData[player.UserId] = {coins = 0, level = 1, xp = 0}
+    end
+    return playerData[player.UserId]
+end
+
+local function saveData(player)
+    local key = "Player_" .. player.UserId
+    local data = playerData[player.UserId]
+    if data then
+        local success, err = pcall(function()
+            dataStore:SetAsync(key, data)
+        end)
+        if not success then
+            warn("Failed to save data for " .. player.Name .. ": " .. err)
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    local data = loadData(player)
+    local leaderstats = Instance.new("Folder")
+    leaderstats.Name = "leaderstats"
+    leaderstats.Parent = player
+
+    local coins = Instance.new("IntValue")
+    coins.Name = "Coins"
+    coins.Value = data.coins
+    coins.Parent = leaderstats
+
+    coins.Changed:Connect(function(newValue)
+        playerData[player.UserId].coins = newValue
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    saveData(player)
+    playerData[player.UserId] = nil
+end)
+
+game:BindToClose(function()
+    for _, player in Players:GetPlayers() do
+        saveData(player)
+    end
+end)
+\`\`\`
+
+══════════════════════════════════════
  SECTION 8: MANDATORY SELF-CHECK
 ══════════════════════════════════════
 
