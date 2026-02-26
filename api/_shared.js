@@ -1,11 +1,13 @@
-// by GIV BOX AI — Enhanced Code Engine v2.0
+// by GIV BOX AI — Enhanced Code Engine v2.1 (FIXED)
 
 const API_URL = 'https://api.siliconflow.com/v1/chat/completions';
 
-// === МУЛЬТИМОДЕЛЬНАЯ СИСТЕМА ===
-// Разные модели для разных задач
+// === МУЛЬТИМОДЕЛЬНАЯ СИСТЕМА (ИСПРАВЛЕНО) ===
 const MODELS = {
   chat: 'tencent/Hunyuan-MT-7B',
+  code: 'tencent/Hunyuan-MT-7B',       // ДОБАВЛЕНО — было undefined
+  analysis: 'tencent/Hunyuan-MT-7B',   // ДОБАВЛЕНО — было undefined
+  fallback: 'tencent/Hunyuan-MT-7B'    // ДОБАВЛЕНО — было undefined
 };
 
 const ALLOWED_ORIGINS = [
@@ -15,7 +17,6 @@ const ALLOWED_ORIGINS = [
 
 // === ОПРЕДЕЛЕНИЕ ЯЗЫКА ПРОГРАММИРОВАНИЯ ===
 const LANGUAGE_PATTERNS = {
-  // Roblox / Luau
   luau: {
     keywords: ['roblox', 'luau', 'rbx', 'studio', 'localscript', 'serverscript',
                'modulescript', 'remoteEvent', 'datastore', 'workspace', 'getservice',
@@ -232,7 +233,6 @@ const CODE_TRIGGER_WORDS = [
   'docker', 'kubernetes', 'aws', 'azure', 'gcp'
 ];
 
-// Слова для анализа/объяснения кода
 const ANALYSIS_TRIGGER_WORDS = [
   'объясни', 'explain', 'как работает', 'how does', 'what does',
   'разбери', 'analyze', 'анализ', 'review', 'ревью', 'почему',
@@ -245,11 +245,8 @@ const ANALYSIS_TRIGGER_WORDS = [
 
 function detectTaskType(text) {
   const lower = text.toLowerCase();
-
-  // Проверяем наличие блоков кода в сообщении (пользователь шарит код для анализа)
   const hasCodeBlock = text.includes('```') || text.includes('`');
 
-  // Подсчёт совпадений
   let codeScore = 0;
   let analysisScore = 0;
 
@@ -261,13 +258,9 @@ function detectTaskType(text) {
     if (lower.includes(word)) analysisScore++;
   }
 
-  // Если есть код + слова анализа → анализ
   if (hasCodeBlock && analysisScore > 0) return 'analysis';
-
-  // Если много кодовых слов → код
   if (codeScore >= 2) return 'code';
 
-  // Если есть хотя бы одно кодовое слово + язык программирования
   if (codeScore >= 1) {
     for (const [lang, data] of Object.entries(LANGUAGE_PATTERNS)) {
       for (const kw of data.keywords) {
@@ -276,10 +269,7 @@ function detectTaskType(text) {
     }
   }
 
-  // Анализ
   if (analysisScore >= 1 && hasCodeBlock) return 'analysis';
-
-  // По умолчанию — чат
   return 'chat';
 }
 
@@ -297,12 +287,11 @@ function detectLanguages(text) {
     }
   }
 
-  // Сортируем по количеству совпадений
   detected.sort((a, b) => b.score - a.score);
   return detected;
 }
 
-// === РАСШИРЕННЫЙ СИСТЕМНЫЙ ПРОМПТ ===
+// === СИСТЕМНЫЙ ПРОМПТ ===
 const DEFAULT_SYSTEM_PROMPT = `You are GIV BOX AI — мощный ИИ-программист и помощник экспертного уровня.
 
 🚨 LANGUAGE RULE:
@@ -327,234 +316,62 @@ const DEFAULT_SYSTEM_PROMPT = `You are GIV BOX AI — мощный ИИ-прог
 🌐 WEB DEVELOPMENT:
   Frontend: HTML5, CSS3, JavaScript ES2024, TypeScript, React, Vue 3,
             Angular, Svelte, Next.js, Nuxt 3, Astro, Solid.js,
-            Tailwind CSS, Bootstrap 5, Material UI, Chakra UI,
-            SASS/SCSS, CSS Modules, Styled Components,
-            PWA, Service Workers, WebGL, Canvas API,
-            WebSocket, SSE, WebRTC
+            Tailwind CSS, Bootstrap 5, Material UI, Chakra UI
   Backend:  Node.js, Express, Fastify, NestJS, Deno, Bun,
-            Python (Django, Flask, FastAPI, Tornado),
+            Python (Django, Flask, FastAPI),
             PHP (Laravel, Symfony), Ruby on Rails,
             Java (Spring Boot), Kotlin (Ktor),
-            Go (Gin, Fiber, Echo), Rust (Actix, Axum),
+            Go (Gin, Fiber), Rust (Actix, Axum),
             C# (ASP.NET Core), Elixir (Phoenix)
   Database: PostgreSQL, MySQL, MongoDB, Redis, SQLite,
             Prisma, Sequelize, TypeORM, Drizzle,
-            Firebase, Supabase, PlanetScale
+            Firebase, Supabase
 
 📱 MOBILE:
   - React Native, Flutter/Dart, Swift/SwiftUI, Kotlin/Jetpack Compose
-  - Expo, Capacitor, Ionic
 
 🤖 AI / ML / DATA:
   - Python: PyTorch, TensorFlow, scikit-learn, Keras, Hugging Face
   - Data: pandas, numpy, matplotlib, seaborn, plotly
-  - NLP, Computer Vision, Reinforcement Learning
-  - LangChain, OpenAI API, vector databases
 
 🔧 DEVOPS / INFRA:
   - Docker, Kubernetes, Terraform, Ansible
   - CI/CD: GitHub Actions, GitLab CI, Jenkins
-  - AWS, Azure, GCP, Vercel, Netlify, Railway
-  - Nginx, Caddy, reverse proxy, load balancing
-
-🔐 SECURITY:
-  - Authentication (JWT, OAuth2, Passport.js, NextAuth)
-  - Encryption, hashing (bcrypt, argon2)
-  - CORS, CSP, XSS prevention, SQL injection prevention
-  - Rate limiting, input validation, sanitization
-
-📦 OTHER:
-  - Blockchain: Solidity, Web3.js, Ethers.js, Smart Contracts
-  - Desktop: Electron, Tauri, WPF, Qt
-  - CLI tools, automation scripts
-  - Regular expressions (any flavor)
-  - Algorithms & Data Structures
-  - System Design & Architecture
-  - Design Patterns (GoF, SOLID, DRY, KISS, YAGNI)
-  - Testing: Jest, Mocha, Pytest, JUnit, Cypress, Playwright
-  - WebAssembly, gRPC, GraphQL, REST API design
-  - Git workflows, monorepos, package management
+  - AWS, Azure, GCP, Vercel, Netlify
 
 ═══════════════════════════════════════════════════════
-🏷️ ПОДПИСЬ — ОБЯЗАТЕЛЬНО, БЕЗ ИСКЛЮЧЕНИЙ
+🏷️ ПОДПИСЬ — ОБЯЗАТЕЛЬНО
 ═══════════════════════════════════════════════════════
 
 КАЖДЫЙ блок кода ОБЯЗАН начинаться с комментария "by GIV BOX AI"
-на САМОЙ ПЕРВОЙ СТРОКЕ в формате комментария данного языка:
-
-  Luau:        -- by GIV BOX AI
-  Python:      # by GIV BOX AI
-  JavaScript:  // by GIV BOX AI
-  TypeScript:  // by GIV BOX AI
-  HTML:        <!-- by GIV BOX AI -->
-  CSS:         /* by GIV BOX AI */
-  C/C++/C#:    // by GIV BOX AI
-  Java/Kotlin: // by GIV BOX AI
-  Swift:       // by GIV BOX AI
-  Rust:        // by GIV BOX AI
-  Go:          // by GIV BOX AI
-  PHP:         // by GIV BOX AI
-  Ruby:        # by GIV BOX AI
-  SQL:         -- by GIV BOX AI
-  Bash:        # by GIV BOX AI
-  PowerShell:  # by GIV BOX AI
-  Dart:        // by GIV BOX AI
-  R:           # by GIV BOX AI
-  MATLAB:      % by GIV BOX AI
-  Assembly:    ; by GIV BOX AI
-  Solidity:    // by GIV BOX AI
-  YAML:        # by GIV BOX AI
-  Dockerfile:  # by GIV BOX AI
-  Haskell:     -- by GIV BOX AI
-  Elixir:      # by GIV BOX AI
-  Perl:        # by GIV BOX AI
-  Scala:       // by GIV BOX AI
-  Vue SFC:     <!-- by GIV BOX AI -->
-  Другой:      используй синтаксис комментариев данного языка + "by GIV BOX AI"
+в формате комментария данного языка.
 
 ═══════════════════════════════════════════════════════
-📐 СТАНДАРТЫ КАЧЕСТВА КОДА — СТРОГО
+📐 СТАНДАРТЫ КАЧЕСТВА КОДА
 ═══════════════════════════════════════════════════════
 
-1. ✅ НОЛЬ ОШИБОК — код должен быть синтаксически идеальным и запускаемым as-is.
-2. ✅ 100% ПОЛНЫЙ — НИКОГДА не пиши "// остальное здесь...", "...", "и т.д.".
-   Всегда заканчивай код ПОЛНОСТЬЮ. Каждую функцию, каждый метод, каждый блок.
-3. ✅ КОММЕНТАРИИ — понятные inline-комментарии на языке пользователя.
-4. ✅ СТРУКТУРА — правильные отступы, нейминг по конвенциям языка.
-5. ✅ BEST PRACTICES — официальные стайл-гайды каждого языка.
-6. ✅ EDGE CASES — обработка ошибок, null/nil/undefined проверки, type safety.
-7. ✅ ВСЕ ИМПОРТЫ — ни один import/require/using не должен быть пропущен.
-8. ✅ ДЛИННЫЙ КОД — даже если скрипт на 500+ строк, пиши его ПОЛНОСТЬЮ.
-9. ✅ НЕЯСНОСТЬ — если запрос неясен, ЗАДАЙ уточняющие вопросы ДО написания кода.
-10. ✅ ОБЪЯСНЕНИЕ — после кода кратко объясни что он делает и как использовать.
-
-═══════════════════════════════════════════════════════
-🎮 ROBLOX / LUAU — СПЕЦИАЛЬНЫЕ ПРАВИЛА
-═══════════════════════════════════════════════════════
-
-- Всегда используй game:GetService("ServiceName")
-- task.wait() вместо wait(), task.spawn() вместо spawn()
-- Различай ServerScript / LocalScript / ModuleScript — УКАЗЫВАЙ где размещать каждый
-- pcall() для DataStore, HTTP и других ненадёжных операций
-- Правильные события: .OnServerEvent, .OnClientEvent, .OnInvoke
-- Luau type annotations где полезно
-- Оптимизация: не используй FindFirstChild в циклах без кэширования
-- Указывай путь: ServerScriptService, StarterPlayerScripts, ReplicatedStorage и т.д.
-- Для UI скриптов указывай родителя (StarterGui → ScreenGui → LocalScript)
-- Players.PlayerAdded:Connect для инициализации игрока
-- Правильная работа с CharacterAdded, Humanoid.Died
-- Debris:AddItem() для временных объектов
-- CollectionService для тегов
-- Attribute API вместо StringValue/IntValue где уместно
-
-═══════════════════════════════════════════════════════
-🐍 PYTHON — СПЕЦИАЛЬНЫЕ ПРАВИЛА
-═══════════════════════════════════════════════════════
-
-- Совместимость Python 3.10+
-- pip install инструкции для внешних библиотек
-- Type hints (def func(x: int) -> str:)
-- f-strings для форматирования
-- try/except с конкретными исключениями
-- if __name__ == "__main__": guard
-- asyncio для асинхронного кода
-- Pathlib вместо os.path где уместно
-- dataclasses / pydantic для моделей данных
-- logging вместо print для продакшн кода
-- Virtual environment инструкции
-
-═══════════════════════════════════════════════════════
-🌐 WEB (HTML/CSS/JS) — СПЕЦИАЛЬНЫЕ ПРАВИЛА
-═══════════════════════════════════════════════════════
-
-- Валидный HTML5: DOCTYPE, meta charset, viewport
-- Семантические теги: header, main, nav, section, article, footer
-- CSS: responsive design, media queries, flexbox/grid
-- JavaScript: ES6+ (const/let, arrow functions, destructuring, modules)
-- Доступность: alt, aria-labels, tabindex, role
-- SEO: meta description, title, proper headings
-- Производительность: lazy loading, минимизация DOM манипуляций
-- Безопасность: sanitize input, CSP headers
-
-═══════════════════════════════════════════════════════
-🔍 АНАЛИЗ КОДА — КОГДА ПОЛЬЗОВАТЕЛЬ ПОКАЗЫВАЕТ СВОЙ КОД
-═══════════════════════════════════════════════════════
-
-Когда пользователь показывает код для анализа/исправления:
-1. Определи язык программирования
-2. Найди ВСЕ ошибки (синтаксические, логические, стилевые)
-3. Объясни КАЖДУЮ ошибку простым языком
-4. Предложи ИСПРАВЛЕННУЮ версию целиком
-5. Укажи потенциальные проблемы безопасности
-6. Предложи оптимизации если есть
-7. Оцени общее качество кода
-
-═══════════════════════════════════════════════════════
-📁 МНОГОФАЙЛОВЫЕ ПРОЕКТЫ
-═══════════════════════════════════════════════════════
-
-Для проектов из нескольких файлов:
-1. Покажи структуру проекта (дерево папок)
-2. Каждый файл в отдельном блоке кода с указанием пути
-3. Укажи порядок создания файлов
-4. Инструкции по установке зависимостей
-5. Инструкции по запуску
-
-Формат:
-📁 project-name/
-├── 📄 package.json
-├── 📄 index.js
-├── 📁 src/
-│   ├── 📄 app.js
-│   └── 📁 routes/
-│       └── 📄 api.js
-└── 📄 README.md
-
-Затем каждый файл:
-\`\`\`javascript
-// 📄 src/app.js
-// by GIV BOX AI
-...код...
-\`\`\`
-
-═══════════════════════════════════════════════════════
-✅ ДРУГИЕ НАВЫКИ
-═══════════════════════════════════════════════════════
-
-- Рецепты и Кулинария (детальные, пошаговые)
-- Домашние задания (Математика, Физика, История — объяснять понятно)
-- Шутки, Загадки, Интересные факты
-- Советы (Здоровье, Карьера, Жизнь)
-- Эссе, Стихи, Рассказы, Творчество
-- Описание мест (ТОЛЬКО если РЕАЛЬНО знаешь)
-
-🌍 ФИЛЬТР ПРАВДЫ — ГЕОГРАФИЯ:
-Если спрашивают о месте:
-  - ЗНАЕШЬ → детальное описание
-  - НЕ ЗНАЕШЬ → честно признайся, НЕ ВЫДУМЫВАЙ
+1. ✅ НОЛЬ ОШИБОК — код синтаксически идеальный и запускаемый
+2. ✅ 100% ПОЛНЫЙ — НИКОГДА не пиши "// остальное здесь..."
+3. ✅ КОММЕНТАРИИ — понятные inline-комментарии
+4. ✅ BEST PRACTICES — официальные стайл-гайды
+5. ✅ EDGE CASES — обработка ошибок
+6. ✅ ВСЕ ИМПОРТЫ — ни один import не пропущен
 
 ═══════════════════════════════════════════════════════
 🎭 ПОВЕДЕНИЕ
 ═══════════════════════════════════════════════════════
 
-- Дружелюбный, умный, с чувством юмора
-- Решай задачи пошагово
+- Дружелюбный, умный
 - Пиши ИДЕАЛЬНЫЙ код без ошибок
 - НИКОГДА не обрезай код
 - ВСЕГДА подписывай код "by GIV BOX AI"
-- Если не знаешь — скажи честно
-- Для сложных задач предложи несколько подходов`;
+- Если не знаешь — скажи честно`;
 
-// === СПЕЦИАЛИЗИРОВАННЫЕ ПРОМПТЫ ДЛЯ РАЗНЫХ ЗАДАЧ ===
 const CODE_BOOST_PROMPT = `
 ADDITIONAL CODE INSTRUCTIONS:
 - You are now in CODE MODE. Focus 100% on writing perfect, production-ready code.
 - Think step by step before writing.
 - Consider edge cases, error handling, and performance.
-- Use the most modern and idiomatic syntax for the target language.
-- If the task is complex, break it into smaller functions/modules.
-- Add TODO comments for potential future improvements.
-- If a design decision is needed, explain your choice briefly.
 `;
 
 const ANALYSIS_BOOST_PROMPT = `
@@ -562,9 +379,6 @@ ADDITIONAL ANALYSIS INSTRUCTIONS:
 - You are now in CODE ANALYSIS MODE.
 - Be thorough and precise in your analysis.
 - Categorize issues: 🔴 Critical, 🟡 Warning, 🔵 Suggestion
-- Check for: bugs, security issues, performance problems, code style
-- Provide a corrected version of the code.
-- Rate the code quality: ⭐ out of 5 stars.
 `;
 
 const DEBUG_BOOST_PROMPT = `
@@ -572,9 +386,6 @@ ADDITIONAL DEBUG INSTRUCTIONS:
 - You are now in DEBUG MODE.
 - Carefully trace through the code logic.
 - Identify the exact line(s) causing the issue.
-- Explain WHY the bug occurs.
-- Provide a minimal fix, then a comprehensive fix.
-- Suggest how to prevent similar bugs in the future.
 `;
 
 // === RATE LIMITING ===
@@ -587,12 +398,10 @@ function checkRate(ip) {
   }
   const u = rateLimits.get(ip);
 
-  // Минимальный интервал между запросами — 2 секунды
   if (u.lastRequest > 0 && (now - u.lastRequest) < 2000) {
     return { allowed: false, reason: 'Подождите пару секунд', retryAfter: 2 };
   }
 
-  // Чистим старые записи
   u.requests = u.requests.filter(t => t > now - 3600000);
 
   const perMin = u.requests.filter(t => t > now - 60000).length;
@@ -628,7 +437,6 @@ function getCorsHeaders(origin) {
 
 // === УМНОЕ СЖАТИЕ ИСТОРИИ ===
 function compressHistory(messages, maxTokenEstimate = 30000) {
-  // Грубая оценка: 1 токен ≈ 4 символа
   const charLimit = maxTokenEstimate * 4;
 
   let totalChars = 0;
@@ -636,13 +444,10 @@ function compressHistory(messages, maxTokenEstimate = 30000) {
     totalChars += (m.content || '').length;
   }
 
-  // Если всё влезает — возвращаем как есть
   if (totalChars <= charLimit) return messages;
 
-  // Стратегия: оставляем первые 2 + последние N сообщений
   const result = [];
 
-  // Первые 2 сообщения (для контекста)
   if (messages.length > 4) {
     result.push(messages[0]);
     result.push(messages[1]);
@@ -652,7 +457,6 @@ function compressHistory(messages, maxTokenEstimate = 30000) {
     });
   }
 
-  // Последние сообщения — самые важные
   const remaining = charLimit - result.reduce((s, m) => s + m.content.length, 0);
   let recentChars = 0;
   const recentMessages = [];
@@ -668,9 +472,25 @@ function compressHistory(messages, maxTokenEstimate = 30000) {
   return result;
 }
 
-// === ГЛАВНАЯ ФУНКЦИЯ AI ===
+// === ГЛАВНАЯ ФУНКЦИЯ AI (ИСПРАВЛЕНА) ===
 async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
   try {
+    // === ВАЛИДАЦИЯ API КЛЮЧА ===
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim() === '') {
+      return {
+        error: true,
+        message: '🔑 API ключ не указан или пустой'
+      };
+    }
+
+    // === ВАЛИДАЦИЯ СООБЩЕНИЙ ===
+    if (!userMessages || !Array.isArray(userMessages) || userMessages.length === 0) {
+      return {
+        error: true,
+        message: '❌ Нет сообщений для отправки'
+      };
+    }
+
     // Определяем тип задачи из последнего сообщения
     const lastUserMessage = [...userMessages]
       .reverse()
@@ -679,46 +499,61 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
       ? String(lastUserMessage.content || lastUserMessage.text || '')
       : '';
 
+    if (!lastText || lastText.trim() === '') {
+      return {
+        error: true,
+        message: '❌ Пустое сообщение'
+      };
+    }
+
     const taskType = detectTaskType(lastText);
     const detectedLangs = detectLanguages(lastText);
 
-    // Выбираем модель на основе типа задачи
-    let selectedModel = MODELS.chat;
-    if (taskType === 'code') selectedModel = MODELS.code;
-    else if (taskType === 'analysis') selectedModel = MODELS.analysis;
+    // === ВЫБОР МОДЕЛИ (ИСПРАВЛЕНО — с проверкой) ===
+    let selectedModel = MODELS.chat; // безопасный дефолт
 
-    // Позволяем переопределить модель
-    if (options.model) selectedModel = options.model;
+    if (taskType === 'code' && MODELS.code) {
+      selectedModel = MODELS.code;
+    } else if (taskType === 'analysis' && MODELS.analysis) {
+      selectedModel = MODELS.analysis;
+    }
+
+    // Переопределение из опций
+    if (options.model && typeof options.model === 'string') {
+      selectedModel = options.model;
+    }
+
+    // === ФИНАЛЬНАЯ ПРОВЕРКА МОДЕЛИ ===
+    if (!selectedModel || typeof selectedModel !== 'string') {
+      selectedModel = 'tencent/Hunyuan-MT-7B';
+      console.warn('Model was undefined, using fallback:', selectedModel);
+    }
+
+    console.log(`[GIV BOX AI] Task: ${taskType}, Model: ${selectedModel}, Languages: ${detectedLangs.map(d => d.lang).join(', ') || 'none'}`);
 
     // Формируем системный промпт
     let finalSystemPrompt = String(systemPrompt || DEFAULT_SYSTEM_PROMPT);
 
-    // Добавляем буст-промпт по типу задачи
     if (taskType === 'code') {
       finalSystemPrompt += '\n\n' + CODE_BOOST_PROMPT;
-
-      // Добавляем контекст о детектированных языках
       if (detectedLangs.length > 0) {
         const langNames = detectedLangs.slice(0, 3).map(d => d.lang).join(', ');
-        finalSystemPrompt += `\nDetected programming language(s): ${langNames}. ` +
-          `Focus your expertise on these technologies.`;
+        finalSystemPrompt += `\nDetected programming language(s): ${langNames}. Focus your expertise on these technologies.`;
       }
     } else if (taskType === 'analysis') {
       finalSystemPrompt += '\n\n' + ANALYSIS_BOOST_PROMPT;
     }
 
-    // Проверяем есть ли слова про дебаг
     const debugWords = ['debug', 'отладь', 'не работает', 'ошибка', 'error',
                         'bug', 'fix', 'исправь', 'crash', 'падает', 'broken'];
     if (debugWords.some(w => lastText.toLowerCase().includes(w))) {
       finalSystemPrompt += '\n\n' + DEBUG_BOOST_PROMPT;
     }
 
-    // Собираем сообщения
+    // === СОБИРАЕМ СООБЩЕНИЯ ===
     const messages = [];
     messages.push({ role: 'system', content: finalSystemPrompt });
 
-    // Обрабатываем историю
     const processedMessages = [];
     for (let i = 0; i < userMessages.length; i++) {
       const m = userMessages[i];
@@ -729,26 +564,31 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
       }
     }
 
-    // Умное сжатие если история слишком длинная
+    if (processedMessages.length === 0) {
+      return {
+        error: true,
+        message: '❌ Нет валидных сообщений после обработки'
+      };
+    }
+
     const compressed = compressHistory(processedMessages);
     messages.push(...compressed);
 
-    // Параметры генерации — адаптивные
-    let temperature = 0.3; // Точнее для кода
+    // === ПАРАМЕТРЫ ГЕНЕРАЦИИ ===
+    let temperature = 0.3;
     let maxTokens = 8192;
     let topP = 0.9;
 
     if (taskType === 'code') {
-      temperature = 0.15; // Ещё точнее для кода
+      temperature = 0.15;
       maxTokens = 8192;
       topP = 0.85;
     } else if (taskType === 'chat') {
-      temperature = 0.6; // Креативнее для разговора
+      temperature = 0.6;
       maxTokens = 4096;
       topP = 0.95;
     }
 
-    // Переопределение из опций
     if (options.temperature !== undefined) temperature = options.temperature;
     if (options.maxTokens !== undefined) maxTokens = options.maxTokens;
 
@@ -761,24 +601,13 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
       stream: false
     };
 
+    console.log(`[GIV BOX AI] Sending request to ${API_URL}, model: ${requestBody.model}, messages: ${messages.length}`);
+
     // === ПЕРВЫЙ ЗАПРОС ===
-    let res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
+    let res;
+    let responseText;
 
-    let responseText = await res.text();
-
-    // === ФОЛЛБЭК НА ДРУГУЮ МОДЕЛЬ ===
-    if (!res.ok && (res.status === 503 || res.status === 500)) {
-      console.log(`Model ${selectedModel} unavailable, trying fallback...`);
-
-      // Пробуем фоллбэк модель
-      requestBody.model = MODELS.fallback;
+    try {
       res = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -788,24 +617,57 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
         body: JSON.stringify(requestBody)
       });
       responseText = await res.text();
+    } catch (fetchError) {
+      console.error('[GIV BOX AI] Fetch error:', fetchError.message);
+      return {
+        error: true,
+        message: '🌐 Ошибка сети: не удалось связаться с API провайдером. ' + fetchError.message
+      };
+    }
 
-      // Если и фоллбэк не работает — пробуем chat модель
-      if (!res.ok) {
-        requestBody.model = MODELS.chat;
-        res = await fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer ' + apiKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        });
-        responseText = await res.text();
+    console.log(`[GIV BOX AI] Response status: ${res.status}, length: ${responseText.length}`);
+
+    // === ФОЛЛБЭК НА ДРУГУЮ МОДЕЛЬ ===
+    if (!res.ok && (res.status === 503 || res.status === 500 || res.status === 404)) {
+      console.log(`[GIV BOX AI] Model ${selectedModel} unavailable (${res.status}), trying fallback...`);
+
+      // Список моделей для попытки
+      const fallbackModels = [
+        MODELS.fallback,
+        MODELS.chat,
+        'tencent/Hunyuan-MT-7B'
+      ].filter(m => m && m !== selectedModel); // убираем дубли и текущую
+
+      for (const fallbackModel of fallbackModels) {
+        console.log(`[GIV BOX AI] Trying fallback model: ${fallbackModel}`);
+        requestBody.model = fallbackModel;
+
+        try {
+          res = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + apiKey,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+          });
+          responseText = await res.text();
+
+          if (res.ok) {
+            console.log(`[GIV BOX AI] Fallback model ${fallbackModel} succeeded`);
+            break;
+          }
+        } catch (e) {
+          console.error(`[GIV BOX AI] Fallback fetch error:`, e.message);
+          continue;
+        }
       }
     }
 
     // === ОБРАБОТКА ОШИБОК ===
     if (!res.ok) {
+      console.error(`[GIV BOX AI] API Error ${res.status}:`, responseText.substring(0, 500));
+
       if (res.status === 503) {
         let waitTime = 30;
         try {
@@ -834,6 +696,24 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
           detail: responseText.substring(0, 300)
         };
       }
+      if (res.status === 404) {
+        return {
+          error: true,
+          message: `❌ Модель "${requestBody.model}" не найдена у провайдера. Проверьте название модели.`,
+          detail: responseText.substring(0, 300)
+        };
+      }
+      if (res.status === 400) {
+        let errorDetail = responseText.substring(0, 500);
+        try {
+          const errObj = JSON.parse(responseText);
+          errorDetail = errObj.error?.message || errObj.message || errorDetail;
+        } catch (e) {}
+        return {
+          error: true,
+          message: `❌ Неверный запрос (400): ${errorDetail}`
+        };
+      }
       return {
         error: true,
         message: `❌ Ошибка провайдера (${res.status})`,
@@ -846,30 +726,43 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
     try {
       data = JSON.parse(responseText);
     } catch (e) {
-      return { error: true, message: '❌ Ошибка парсинга JSON ответа' };
+      console.error('[GIV BOX AI] JSON parse error:', e.message, 'Response:', responseText.substring(0, 200));
+      return {
+        error: true,
+        message: '❌ Ошибка парсинга ответа от API',
+        detail: responseText.substring(0, 200)
+      };
     }
 
     let content = '';
     if (data.choices && data.choices[0] && data.choices[0].message) {
       content = data.choices[0].message.content;
+    } else if (data.choices && data.choices[0] && data.choices[0].text) {
+      content = data.choices[0].text;
     } else if (Array.isArray(data) && data[0] && data[0].generated_text) {
       content = data[0].generated_text;
+    } else if (data.output) {
+      content = typeof data.output === 'string' ? data.output : JSON.stringify(data.output);
     }
 
     if (!content || content.trim() === '') {
-      return { error: true, message: '❌ Пустой ответ от модели' };
+      console.error('[GIV BOX AI] Empty content. Full response:', JSON.stringify(data).substring(0, 500));
+      return {
+        error: true,
+        message: '❌ Пустой ответ от модели. Попробуйте переформулировать запрос.',
+        detail: JSON.stringify(data).substring(0, 300)
+      };
     }
 
     // === АВТОПРОДОЛЖЕНИЕ ДЛЯ ДЛИННОГО КОДА ===
     let finishReason = data.choices && data.choices[0] && data.choices[0].finish_reason;
     let attempts = 0;
-    const maxContinuations = 5; // Больше попыток для очень длинного кода
+    const maxContinuations = 3;
 
     while (finishReason === 'length' && attempts < maxContinuations) {
       attempts++;
-      console.log(`Auto-continue attempt ${attempts}/${maxContinuations}`);
+      console.log(`[GIV BOX AI] Auto-continue attempt ${attempts}/${maxContinuations}`);
 
-      // Анализируем обрезанный контент
       const hasOpenCodeBlock = (content.match(/```/g) || []).length % 2 !== 0;
       const lastLines = content.split('\n').slice(-5).join('\n');
 
@@ -877,55 +770,57 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
       if (hasOpenCodeBlock) {
         continuePrompt = 'Код был обрезан. Продолжи ТОЧНО с места обрыва. ' +
           'НЕ начинай заново. НЕ повторяй написанное. ' +
-          'Продолжи с того же блока кода. ' +
           `Последние строки были:\n\`\`\`\n${lastLines}\n\`\`\``;
       } else {
-        continuePrompt = 'Ответ был обрезан. Продолжи ТОЧНО с места обрыва. ' +
-          'НЕ повторяй уже написанное.';
+        continuePrompt = 'Ответ был обрезан. Продолжи ТОЧНО с места обрыва.';
       }
 
       const continueMessages = [...messages];
       continueMessages.push({ role: 'assistant', content: content });
       continueMessages.push({ role: 'user', content: continuePrompt });
 
-      const contRes = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + apiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: requestBody.model,
-          messages: continueMessages,
-          max_tokens: maxTokens,
-          temperature: 0.15, // Минимальная температура для продолжения
-          top_p: 0.85,
-          stream: false
-        })
-      });
-
-      if (!contRes.ok) {
-        console.log('Continue request failed:', contRes.status);
-        break;
-      }
-
-      let contData;
       try {
-        contData = JSON.parse(await contRes.text());
-      } catch (e) {
-        console.log('Continue parse error');
+        const contRes = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: requestBody.model,
+            messages: continueMessages,
+            max_tokens: maxTokens,
+            temperature: 0.15,
+            top_p: 0.85,
+            stream: false
+          })
+        });
+
+        if (!contRes.ok) {
+          console.log('[GIV BOX AI] Continue request failed:', contRes.status);
+          break;
+        }
+
+        let contData;
+        try {
+          contData = JSON.parse(await contRes.text());
+        } catch (e) {
+          console.log('[GIV BOX AI] Continue parse error');
+          break;
+        }
+
+        const contContent = contData.choices && contData.choices[0] &&
+                             contData.choices[0].message && contData.choices[0].message.content;
+        if (!contContent || contContent.trim() === '') break;
+
+        const cleanCont = removeDuplicatePrefix(content, contContent);
+        content += '\n' + cleanCont;
+
+        finishReason = contData.choices[0].finish_reason;
+      } catch (contError) {
+        console.error('[GIV BOX AI] Continue error:', contError.message);
         break;
       }
-
-      const contContent = contData.choices && contData.choices[0] &&
-                           contData.choices[0].message && contData.choices[0].message.content;
-      if (!contContent || contContent.trim() === '') break;
-
-      // Умная склейка — убираем дублирование
-      const cleanCont = removeDuplicatePrefix(content, contContent);
-      content += '\n' + cleanCont;
-
-      finishReason = contData.choices[0].finish_reason;
     }
 
     // === ПОСТ-ОБРАБОТКА ===
@@ -944,28 +839,25 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
     };
 
   } catch (e) {
-    console.error('callAI error:', e);
+    console.error('[GIV BOX AI] Critical error:', e.message, e.stack);
     return {
       error: true,
-      message: '❌ Ошибка соединения: ' + e.message
+      message: '❌ Внутренняя ошибка: ' + e.message
     };
   }
 }
 
 // === УДАЛЕНИЕ ДУБЛИРОВАНИЯ ПРИ СКЛЕЙКЕ ===
 function removeDuplicatePrefix(existingContent, newContent) {
-  // Ищем перекрытие — если начало нового совпадает с концом старого
   const existingLines = existingContent.split('\n');
   const newLines = newContent.split('\n');
 
-  // Проверяем последние 10 строк существующего контента
   const checkLines = Math.min(10, existingLines.length);
   for (let overlap = checkLines; overlap >= 3; overlap--) {
     const existingTail = existingLines.slice(-overlap).join('\n').trim();
     const newHead = newLines.slice(0, overlap).join('\n').trim();
 
     if (existingTail === newHead) {
-      // Нашли дублирование — убираем его
       return newLines.slice(overlap).join('\n');
     }
   }
@@ -975,13 +867,11 @@ function removeDuplicatePrefix(existingContent, newContent) {
 
 // === ПОСТ-ОБРАБОТКА КОДА ===
 function postProcessCode(content) {
-  // Проверяем незакрытые блоки кода
   const codeBlockCount = (content.match(/```/g) || []).length;
   if (codeBlockCount % 2 !== 0) {
     content += '\n```';
   }
 
-  // Убираем лишние пустые строки (больше 2 подряд)
   content = content.replace(/\n{4,}/g, '\n\n\n');
 
   return content;
