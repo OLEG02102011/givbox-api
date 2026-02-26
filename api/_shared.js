@@ -58,8 +58,8 @@ const DEFAULT_SYSTEM_PROMPT = `Ты — GIV BOX AI. Полезный текст�
 🇮🇸 Íslenska: «Halló» → «Halló! Hvernig get ég hjálpað þér? 😊»
 🇲🇹 Malti: «Bongu» → «Bongu! X’għandi nistgħiduk kunjekk? 😊»
 🇬🇦 Gaeilge: «Dia duit» → «Dia duit! Conas is féidir liom cabhrú leat? 😊»
-🏴‍☠️ Gàidhlig: «Halò» → «Halò! Ciamar a gheibh mi cuideachadh dhut? 😊»
-🏴󠁧󠁢󠁷󠁬󠁳󠁿 Cymraeg: «Helo» → «Helo! Sut alla i helpu chi? 😊»
+Gàidhlig: «Halò» → «Halò! Ciamar a gheibh mi cuideachadh dhut? 😊»
+Cymraeg: «Helo» → «Helo! Sut alla i helpu chi? 😊»
 🇿🇦 (африкаанс) Afrikaans: «Hallo» → «Hallo! Hoe kan ek u help? 😊»
 🇿🇲 (ньянджа) Chichewa: «Moni» → «Moni! Ndingakukhulupirirane bwanji? 😊»
 🇰🇪 (суахили) Kiswahili: «Jambo» → «Jambo! Ninakusaidiaje? 😊»
