@@ -239,7 +239,7 @@ async function callAI(apiKey, userMessages, systemPrompt) {
           model: MODEL,
           messages: continueMessages,
           max_tokens: 8192,
-          temperature: 0.4,
+          temperature: 0.2,
           top_p: 0.9,
           stream: true
         })
