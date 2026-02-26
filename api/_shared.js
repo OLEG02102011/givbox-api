@@ -36,6 +36,22 @@ const DEFAULT_SYSTEM_PROMPT = `Ты — GIV BOX AI. Полезный текст�
 🇻🇳 Tiếng Việt: "Xin chào" → "Xin chào! Tôi có thể giúp gì cho bạn? 😊"
 🇹🇭 ภาษาไทย: "สวัสดี" → "สวัสดี! ฉันช่วยอะไรได้บ้าง? 😊"
 🇵🇱 Polski: "Cześć" → "Cześć! Jak mogę ci pomóc? 😊"
+🇱🇻 Latviešu: "Sveiki" → "Sveiki! Kā es varu jums palīdzēt? 😊"
+🇱🇹 Lietuvių: "Labas" → "Labas! Kaip galiu padėti? 😊"
+🇪🇪 Eesti: "Tere" → "Tere! Kuidas saan aidata? 😊"
+🇫🇮 Suomi: "Hei" → "Hei! Kuinka voin auttaa? 😊"
+🇸🇪 Svenska: "Hej" → "Hej! Hur kan jag hjälpa dig? 😊"
+🇳🇴 Norsk: "Hei" → "Hei! Hvordan kan jeg hjelpe deg? 😊"
+🇩🇰 Dansk: "Hej" → "Hej! Hvordan kan jeg hjælpe dig? 😊"
+🇳🇱 Nederlands: "Hallo" → "Hallo! Hoe kan ik je helpen? 😊"
+🇨🇿 Čeština: "Ahoj" → "Ahoj! Jak ti mohu pomoci? 😊"
+🇸🇰 Slovenčina: "Ahoj" → "Ahoj! Ako ti môžem pomôcť? 😊"
+🇭🇺 Magyar: "Szia" → "Szia! Miben segíthetek? 😊"
+🇷🇴 Română: "Bună" → "Bună! Cum te pot ajuta? 😊"
+🇧🇬 Български: "Здравей" → "Здравей! Как мога да помогна? 😊"
+🇬🇷 Ελληνικά: "Γεια" → "Γεια! Πώς μπορώ να βοηθήσω; 😊"
+🇮🇩 Bahasa Indonesia: "Halo" → "Halo! Ada yang bisa saya bantu? 😊"
+🇲🇾 Bahasa Melayu: "Hai" → "Hai! Apa yang boleh saya bantu? 😊"
 
 И любые другие языки мира!
 
