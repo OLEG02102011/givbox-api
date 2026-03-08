@@ -6,7 +6,153 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000'
 ];
 
-const DEFAULT_SYSTEM_PROMPT = `Ты — GIV BOX AI. Очень умный и внимательный помощник.
+// ==================== КЭШИ ====================
+const weatherCache = {
+  data: null,
+  timestamp: 0,
+  city: ''
+};
+
+const rateLimits = new Map();
+
+// ==================== ДАТА / ВРЕМЯ ====================
+function getDateTimeInfo(timezone = 'Europe/Moscow') {
+  const now = new Date();
+
+  const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long'
+  });
+
+  const timeFormatter = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  // Получаем компоненты для вычислений
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false
+  }).formatToParts(now);
+
+  let year, month, day, hour, minute;
+  for (const part of parts) {
+    if (part.type === 'year') year = parseInt(part.value);
+    if (part.type === 'month') month = parseInt(part.value);
+    if (part.type === 'day') day = parseInt(part.value);
+    if (part.type === 'hour') hour = parseInt(part.value);
+    if (part.type === 'minute') minute = parseInt(part.value);
+  }
+
+  const monthNames = [
+    'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+    'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'
+  ];
+
+  // Сколько дней в каждом месяце текущего года
+  const allMonthsDays = [];
+  for (let m = 1; m <= 12; m++) {
+    const d = new Date(year, m, 0).getDate();
+    allMonthsDays.push({ name: monthNames[m - 1], days: d });
+  }
+
+  const daysInCurrentMonth = new Date(year, month, 0).getDate();
+
+  // Определяем время суток
+  let timeOfDay;
+  if (hour >= 5 && hour < 12) timeOfDay = 'утро';
+  else if (hour >= 12 && hour < 17) timeOfDay = 'день';
+  else if (hour >= 17 && hour < 22) timeOfDay = 'вечер';
+  else timeOfDay = 'ночь';
+
+  return {
+    dateFormatted: dateFormatter.format(now),
+    timeFormatted: timeFormatter.format(now),
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    timeOfDay,
+    daysInCurrentMonth,
+    currentMonthName: monthNames[month - 1],
+    allMonthsDays,
+    timezone
+  };
+}
+
+// ==================== ПОГОДА ====================
+async function getWeather(city = 'Moscow') {
+  const now = Date.now();
+
+  // Кэш на 30 минут
+  if (
+    weatherCache.data &&
+    weatherCache.city === city &&
+    (now - weatherCache.timestamp) < 1800000
+  ) {
+    return weatherCache.data;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000); // 5 сек таймаут
+
+    const res = await fetch(
+      `https://wttr.in/${encodeURIComponent(city)}?format=j1&lang=ru`,
+      {
+        headers: { 'User-Agent': 'curl/7.0' },
+        signal: controller.signal
+      }
+    );
+    clearTimeout(timeout);
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const current = data.current_condition[0];
+
+    const cityRuMap = {
+      'Moscow': 'Москва',
+      'Saint Petersburg': 'Санкт-Петербург',
+      'Novosibirsk': 'Новосибирск',
+      'Yekaterinburg': 'Екатеринбург',
+      'Kazan': 'Казань'
+    };
+
+    const weather = {
+      temp: current.temp_C,
+      feelsLike: current.FeelsLikeC,
+      description: (current.lang_ru && current.lang_ru[0])
+        ? current.lang_ru[0].value
+        : current.weatherDesc[0].value,
+      humidity: current.humidity,
+      windSpeed: current.windspeedKmph,
+      city: cityRuMap[city] || city
+    };
+
+    weatherCache.data = weather;
+    weatherCache.city = city;
+    weatherCache.timestamp = now;
+
+    return weather;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ==================== СИСТЕМНЫЙ ПРОМПТ ====================
+const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `Ты — GIV BOX AI. Очень умный и внимательный помощник.
 
 САМОЕ ГЛАВНОЕ:
 1. НИКОГДА не придумывай факты и не выдумывай определения несуществующих слов.
@@ -20,6 +166,17 @@ const DEFAULT_SYSTEM_PROMPT = `Ты — GIV BOX AI. Очень умный и в�
 — "что такое квантовая механика" → объясни понятно и точно
 
 Если всё-таки не уверен — лучше спроси уточнение, чем выдумывай.
+
+=== ТЕКУЩАЯ ДАТА И ВРЕМЯ ===
+{{DATETIME_BLOCK}}
+
+=== ПОГОДА ===
+{{WEATHER_BLOCK}}
+
+=== КАЛЕНДАРЬ: ДНИ В МЕСЯЦАХ ===
+{{MONTHS_BLOCK}}
+
+ВАЖНО: Если пользователь спрашивает "который час", "какое сегодня число", "какой день недели", "сколько дней в мае" и т.п. — используй информацию выше. Она актуальна на момент запроса. Не придумывай другие значения.
 
 === ФОРМАТИРОВАНИЕ ТЕКСТА ===
 Ты МОЖЕШЬ и ДОЛЖЕН использовать форматирование для красивых ответов:
@@ -74,8 +231,52 @@ const DEFAULT_SYSTEM_PROMPT = `Ты — GIV BOX AI. Очень умный и в�
 - Не пиши код и скрипты (вежливо откажи)
 - Рандомное число — выдавай сразу одно, например: "77 🎲"`;
 
-const rateLimits = new Map();
+// ==================== СБОРКА ПРОМПТА ====================
+async function buildSystemPrompt(customPrompt, options = {}) {
+  const {
+    city = 'Moscow',
+    timezone = 'Europe/Moscow'
+  } = options;
 
+  const dt = getDateTimeInfo(timezone);
+  const weather = await getWeather(city);
+
+  // Блок даты/времени
+  const datetimeBlock = [
+    `Сейчас: ${dt.dateFormatted}`,
+    `Время: ${dt.timeFormatted} (${dt.timeOfDay})`,
+    `Часовой пояс: ${dt.timezone}`,
+    `Сегодня: ${dt.day} ${dt.currentMonthName} ${dt.year} года`
+  ].join('\n');
+
+  // Блок погоды
+  let weatherBlock;
+  if (weather) {
+    weatherBlock = [
+      `Город: ${weather.city}`,
+      `Температура: ${weather.temp}°C (ощущается как ${weather.feelsLike}°C)`,
+      `Погода: ${weather.description}`,
+      `Влажность: ${weather.humidity}%`,
+      `Ветер: ${weather.windSpeed} км/ч`
+    ].join('\n');
+  } else {
+    weatherBlock = 'Данные о погоде временно недоступны. Если спросят — скажи, что не удалось получить данные о погоде.';
+  }
+
+  // Блок месяцев
+  const monthsBlock = dt.allMonthsDays
+    .map(m => `- ${m.name.charAt(0).toUpperCase() + m.name.slice(1)} ${dt.year}: ${m.days} дней`)
+    .join('\n');
+
+  const basePrompt = customPrompt || DEFAULT_SYSTEM_PROMPT_TEMPLATE;
+
+  return basePrompt
+    .replace('{{DATETIME_BLOCK}}', datetimeBlock)
+    .replace('{{WEATHER_BLOCK}}', weatherBlock)
+    .replace('{{MONTHS_BLOCK}}', monthsBlock);
+}
+
+// ==================== RATE LIMIT ====================
 function checkRate(ip) {
   const now = Date.now();
   if (!rateLimits.has(ip)) {
@@ -111,13 +312,20 @@ function getCorsHeaders(origin) {
   };
 }
 
-async function callAI(apiKey, userMessages, systemPrompt) {
+// ==================== ВЫЗОВ AI ====================
+async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
   try {
+    // Собираем динамический системный промпт с датой/погодой
+    const dynamicPrompt = await buildSystemPrompt(systemPrompt, {
+      city: options.city || 'Moscow',
+      timezone: options.timezone || 'Europe/Moscow'
+    });
+
     const messages = [];
 
     messages.push({
       role: 'system',
-      content: String(systemPrompt || DEFAULT_SYSTEM_PROMPT)
+      content: String(dynamicPrompt)
     });
 
     for (let i = 0; i < userMessages.length; i++) {
@@ -215,7 +423,7 @@ async function callAI(apiKey, userMessages, systemPrompt) {
           max_tokens: 8192,
           temperature: 0.2,
           top_p: 0.9,
-          stream: true
+          stream: false
         })
       });
 
@@ -243,10 +451,13 @@ async function callAI(apiKey, userMessages, systemPrompt) {
 
 module.exports = {
   ALLOWED_ORIGINS,
-  DEFAULT_SYSTEM_PROMPT,
+  DEFAULT_SYSTEM_PROMPT_TEMPLATE,
   MODEL,
   checkRate,
   recordRate,
   getCorsHeaders,
-  callAI
+  callAI,
+  buildSystemPrompt,
+  getDateTimeInfo,
+  getWeather
 };
