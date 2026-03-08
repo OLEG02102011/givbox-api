@@ -6,16 +6,10 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000'
 ];
 
-// ==================== КЭШИ ====================
-const weatherCache = {
-  data: null,
-  timestamp: 0,
-  city: ''
-};
-
+const weatherCache = { data: null, timestamp: 0, city: '' };
 const rateLimits = new Map();
 
-// ==================== ДАТА / ВРЕМЯ ====================
+// ==================== ДАТА / ВРЕМЯ / ВЫЧИСЛЕНИЯ ====================
 function getDateTimeInfo(timezone = 'Europe/Moscow') {
   const now = new Date();
 
@@ -34,7 +28,6 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
     hour12: false
   });
 
-  // Получаем компоненты для вычислений
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
     year: 'numeric',
@@ -54,21 +47,93 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
     if (part.type === 'minute') minute = parseInt(part.value);
   }
 
-  const monthNames = [
+  const monthNamesIm = [
     'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
     'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'
+  ];
+
+  const monthNamesRod = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
   ];
 
   // Сколько дней в каждом месяце текущего года
   const allMonthsDays = [];
   for (let m = 1; m <= 12; m++) {
     const d = new Date(year, m, 0).getDate();
-    allMonthsDays.push({ name: monthNames[m - 1], days: d });
+    allMonthsDays.push({ name: monthNamesIm[m - 1], days: d });
   }
 
   const daysInCurrentMonth = new Date(year, month, 0).getDate();
+  const daysLeftInMonth = daysInCurrentMonth - day;
 
-  // Определяем время суток
+  // === Функция подсчёта разницы в днях ===
+  function daysBetween(y1, m1, d1, y2, m2, d2) {
+    const a = new Date(y1, m1 - 1, d1);
+    const b = new Date(y2, m2 - 1, d2);
+    return Math.round((b - a) / 86400000);
+  }
+
+  // === Дни до начала каждого будущего месяца ===
+  const daysUntilMonths = [];
+  for (let m = 1; m <= 12; m++) {
+    let targetYear = year;
+    let diff = daysBetween(year, month, day, targetYear, m, 1);
+    if (diff <= 0) {
+      targetYear = year + 1;
+      diff = daysBetween(year, month, day, targetYear, m, 1);
+    }
+    daysUntilMonths.push({
+      name: monthNamesRod[m - 1],
+      nameIm: monthNamesIm[m - 1],
+      month: m,
+      days: diff,
+      year: targetYear
+    });
+  }
+
+  // === Дни до сезонов ===
+  const seasons = [
+    { name: 'весны', startMonth: 3, startDay: 1 },
+    { name: 'лета', startMonth: 6, startDay: 1 },
+    { name: 'осени', startMonth: 9, startDay: 1 },
+    { name: 'зимы', startMonth: 12, startDay: 1 }
+  ];
+
+  const daysUntilSeasons = [];
+  for (const s of seasons) {
+    let targetYear = year;
+    let diff = daysBetween(year, month, day, targetYear, s.startMonth, s.startDay);
+    if (diff <= 0) {
+      targetYear = year + 1;
+      diff = daysBetween(year, month, day, targetYear, s.startMonth, s.startDay);
+    }
+    daysUntilSeasons.push({
+      name: s.name,
+      days: diff,
+      year: targetYear
+    });
+  }
+
+  // === Текущий сезон ===
+  let currentSeason;
+  if (month >= 3 && month <= 5) currentSeason = 'весна';
+  else if (month >= 6 && month <= 8) currentSeason = 'лето';
+  else if (month >= 9 && month <= 11) currentSeason = 'осень';
+  else currentSeason = 'зима';
+
+  // === Дни до Нового года ===
+  const daysUntilNewYear = daysBetween(year, month, day, year + 1, 1, 1);
+
+  // === День в году / всего дней в году ===
+  const startOfYear = new Date(year, 0, 1);
+  const todayDate = new Date(year, month - 1, day);
+  const dayOfYear = Math.round((todayDate - startOfYear) / 86400000) + 1;
+  const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+  const totalDaysInYear = isLeapYear ? 366 : 365;
+  const daysLeftInYear = totalDaysInYear - dayOfYear;
+
+  // === Время суток ===
   let timeOfDay;
   if (hour >= 5 && hour < 12) timeOfDay = 'утро';
   else if (hour >= 12 && hour < 17) timeOfDay = 'день';
@@ -84,9 +149,19 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
     hour,
     minute,
     timeOfDay,
+    currentSeason,
+    isLeapYear,
+    currentMonthName: monthNamesIm[month - 1],
+    currentMonthNameRod: monthNamesRod[month - 1],
     daysInCurrentMonth,
-    currentMonthName: monthNames[month - 1],
+    daysLeftInMonth,
     allMonthsDays,
+    daysUntilMonths,
+    daysUntilSeasons,
+    daysUntilNewYear,
+    dayOfYear,
+    totalDaysInYear,
+    daysLeftInYear,
     timezone
   };
 }
@@ -94,61 +169,48 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
 // ==================== ПОГОДА ====================
 async function getWeather(city = 'Moscow') {
   const now = Date.now();
-
-  // Кэш на 30 минут
-  if (
-    weatherCache.data &&
-    weatherCache.city === city &&
-    (now - weatherCache.timestamp) < 1800000
-  ) {
+  if (weatherCache.data && weatherCache.city === city && (now - weatherCache.timestamp) < 1800000) {
     return weatherCache.data;
   }
-
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000); // 5 сек таймаут
-
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(
       `https://wttr.in/${encodeURIComponent(city)}?format=j1&lang=ru`,
-      {
-        headers: { 'User-Agent': 'curl/7.0' },
-        signal: controller.signal
-      }
+      { headers: { 'User-Agent': 'curl/7.0' }, signal: controller.signal }
     );
     clearTimeout(timeout);
-
     if (!res.ok) return null;
-
     const data = await res.json();
     const current = data.current_condition[0];
-
     const cityRuMap = {
-      'Moscow': 'Москва',
-      'Saint Petersburg': 'Санкт-Петербург',
-      'Novosibirsk': 'Новосибирск',
-      'Yekaterinburg': 'Екатеринбург',
-      'Kazan': 'Казань'
+      'Moscow': 'Москва', 'Saint Petersburg': 'Санкт-Петербург',
+      'Novosibirsk': 'Новосибирск', 'Yekaterinburg': 'Екатеринбург', 'Kazan': 'Казань'
     };
-
     const weather = {
       temp: current.temp_C,
       feelsLike: current.FeelsLikeC,
-      description: (current.lang_ru && current.lang_ru[0])
-        ? current.lang_ru[0].value
-        : current.weatherDesc[0].value,
+      description: (current.lang_ru && current.lang_ru[0]) ? current.lang_ru[0].value : current.weatherDesc[0].value,
       humidity: current.humidity,
       windSpeed: current.windspeedKmph,
       city: cityRuMap[city] || city
     };
-
     weatherCache.data = weather;
     weatherCache.city = city;
     weatherCache.timestamp = now;
-
     return weather;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
+}
+
+// ==================== СКЛОНЕНИЕ "ДНЕЙ" ====================
+function daysWord(n) {
+  const abs = Math.abs(n);
+  const last2 = abs % 100;
+  const last1 = abs % 10;
+  if (last2 >= 11 && last2 <= 19) return 'дней';
+  if (last1 === 1) return 'день';
+  if (last1 >= 2 && last1 <= 4) return 'дня';
+  return 'дней';
 }
 
 // ==================== СИСТЕМНЫЙ ПРОМПТ ====================
@@ -173,10 +235,25 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `Ты — GIV BOX AI. Очень умны
 === ПОГОДА ===
 {{WEATHER_BLOCK}}
 
-=== КАЛЕНДАРЬ: ДНИ В МЕСЯЦАХ ===
+=== КАЛЕНДАРЬ: ДНИ В МЕСЯЦАХ ({{YEAR}} год) ===
 {{MONTHS_BLOCK}}
 
-ВАЖНО: Если пользователь спрашивает "который час", "какое сегодня число", "какой день недели", "сколько дней в мае" и т.п. — используй информацию выше. Она актуальна на момент запроса. Не придумывай другие значения.
+=== ПРЕДВЫЧИСЛЕННЫЕ РАССТОЯНИЯ В ДНЯХ ===
+{{DISTANCES_BLOCK}}
+
+=== СЕЗОНЫ ===
+{{SEASONS_BLOCK}}
+
+=== ГОД ===
+{{YEAR_BLOCK}}
+
+КРИТИЧЕСКИ ВАЖНО О ДАТАХ:
+- Сейчас {{YEAR}} год. НЕ ДРУГОЙ.
+- Все числа выше ТОЧНО ВЫЧИСЛЕНЫ компьютером. ИСПОЛЬЗУЙ ИХ КАК ЕСТЬ.
+- НИКОГДА не считай дни самостоятельно — бери ГОТОВЫЕ числа из блока «ПРЕДВЫЧИСЛЕННЫЕ РАССТОЯНИЯ».
+- Если спрашивают «сколько дней до лета» — найди строку «До лета» выше и скажи число оттуда.
+- Если спрашивают «сколько дней в мае» — найди строку «Май» в календаре выше.
+- НЕ ОКРУГЛЯЙ, НЕ ИСПРАВЛЯЙ эти числа. Они точные.
 
 === ФОРМАТИРОВАНИЕ ТЕКСТА ===
 Ты МОЖЕШЬ и ДОЛЖЕН использовать форматирование для красивых ответов:
@@ -187,25 +264,6 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `Ты — GIV BOX AI. Очень умны
 ==выделение== — для ключевых фраз, определений
 # Заголовок — для разделов (# ## ###)
 > цитата — для цитирования
-
-Примеры использования:
-
-Вопрос: "что такое фотосинтез?"
-Ответ:
-## Фотосинтез 🌿
-**Фотосинтез** — это процесс, при котором растения преобразуют *солнечный свет* в энергию.
-Основные компоненты:
-- **Свет** — источник энергии
-- **Вода** — поступает через корни
-- **CO₂** — поглощается из воздуха
-
-Вопрос: "ингредиенты борща"
-Ответ:
-## Ингредиенты борща 🍲
-- **Свёкла** — *главный ингредиент*
-- **Капуста** — нашинкованная
-- **Картофель** — кубиками
-- **Морковь** и **лук** — для зажарки
 
 ПРАВИЛА форматирования:
 - Используй форматирование ВСЕГДА когда это уместно
@@ -218,11 +276,6 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `Ты — GIV BOX AI. Очень умны
 === ПРАВИЛО ПОВТОРЕНИЯ ===
 Если сообщение начинается с "Скажи", "Напиши", "Повтори", "Say", "Write", "Repeat", "Di", "Écris", "Sag", "Scrivi", "Diga", "说", "言って", "말해", "Söyle", "قل", "बोलो" и т.п. на любом языке — выведи ТОЛЬКО текст после этого слова. Без кавычек, без пояснений, без ничего лишнего. БЕЗ форматирования.
 
-Примеры:
-"Скажи я люблю пиццу" → я люблю пиццу
-"say hello world" → hello world
-"Напиши: котики милые" → котики милые
-
 === ЯЗЫК ===
 Отвечай строго на языке последнего сообщения пользователя.
 
@@ -233,23 +286,24 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `Ты — GIV BOX AI. Очень умны
 
 // ==================== СБОРКА ПРОМПТА ====================
 async function buildSystemPrompt(customPrompt, options = {}) {
-  const {
-    city = 'Moscow',
-    timezone = 'Europe/Moscow'
-  } = options;
+  const { city = 'Moscow', timezone = 'Europe/Moscow' } = options;
 
   const dt = getDateTimeInfo(timezone);
   const weather = await getWeather(city);
 
-  // Блок даты/времени
+  // --- Блок даты/времени ---
   const datetimeBlock = [
-    `Сейчас: ${dt.dateFormatted}`,
+    `Сегодня: ${dt.dateFormatted}`,
+    `Точная дата: ${dt.day} ${dt.currentMonthNameRod} ${dt.year} года`,
+    `Текущий год: ${dt.year}`,
     `Время: ${dt.timeFormatted} (${dt.timeOfDay})`,
     `Часовой пояс: ${dt.timezone}`,
-    `Сегодня: ${dt.day} ${dt.currentMonthName} ${dt.year} года`
+    `Текущий сезон: ${dt.currentSeason}`,
+    `В текущем месяце (${dt.currentMonthName}): ${dt.daysInCurrentMonth} ${daysWord(dt.daysInCurrentMonth)}`,
+    `Сегодня ${dt.day}-й день месяца, осталось ${dt.daysLeftInMonth} ${daysWord(dt.daysLeftInMonth)} до конца ${dt.currentMonthNameRod}`
   ].join('\n');
 
-  // Блок погоды
+  // --- Блок погоды ---
   let weatherBlock;
   if (weather) {
     weatherBlock = [
@@ -260,20 +314,61 @@ async function buildSystemPrompt(customPrompt, options = {}) {
       `Ветер: ${weather.windSpeed} км/ч`
     ].join('\n');
   } else {
-    weatherBlock = 'Данные о погоде временно недоступны. Если спросят — скажи, что не удалось получить данные о погоде.';
+    weatherBlock = 'Данные о погоде временно недоступны. Если спросят — скажи что не удалось получить данные.';
   }
 
-  // Блок месяцев
+  // --- Блок месяцев ---
   const monthsBlock = dt.allMonthsDays
-    .map(m => `- ${m.name.charAt(0).toUpperCase() + m.name.slice(1)} ${dt.year}: ${m.days} дней`)
+    .map(m => `- ${m.name.charAt(0).toUpperCase() + m.name.slice(1)} ${dt.year}: ${m.days} ${daysWord(m.days)}`)
     .join('\n');
 
+  // --- Блок предвычисленных расстояний ---
+  const distanceLines = [];
+  distanceLines.push(`Сегодня: ${dt.day} ${dt.currentMonthNameRod} ${dt.year}`);
+  distanceLines.push('');
+  distanceLines.push('Дней до начала каждого месяца (от сегодня):');
+  for (const m of dt.daysUntilMonths) {
+    distanceLines.push(`- До 1 ${m.name} ${m.year}: ${m.days} ${daysWord(m.days)}`);
+  }
+  distanceLines.push('');
+  distanceLines.push('Дней до сезонов (от сегодня):');
+  for (const s of dt.daysUntilSeasons) {
+    distanceLines.push(`- До ${s.name} (${s.year}): ${s.days} ${daysWord(s.days)}`);
+  }
+  distanceLines.push('');
+  distanceLines.push(`До конца текущего месяца (${dt.currentMonthName}): ${dt.daysLeftInMonth} ${daysWord(dt.daysLeftInMonth)}`);
+  distanceLines.push(`До Нового ${dt.year + 1} года: ${dt.daysUntilNewYear} ${daysWord(dt.daysUntilNewYear)}`);
+  const distancesBlock = distanceLines.join('\n');
+
+  // --- Блок сезонов ---
+  const seasonsBlock = [
+    `Сейчас: ${dt.currentSeason} ${dt.year}`,
+    `Весна: март, апрель, май`,
+    `Лето: июнь, июль, август`,
+    `Осень: сентябрь, октябрь, ноябрь`,
+    `Зима: декабрь, январь, февраль`
+  ].join('\n');
+
+  // --- Блок года ---
+  const yearBlock = [
+    `Текущий год: ${dt.year}`,
+    `Високосный: ${dt.isLeapYear ? 'да' : 'нет'}`,
+    `Всего дней в ${dt.year} году: ${dt.totalDaysInYear}`,
+    `Сегодня ${dt.dayOfYear}-й день года`,
+    `Осталось дней в году: ${dt.daysLeftInYear}`
+  ].join('\n');
+
+  // --- Подстановка ---
   const basePrompt = customPrompt || DEFAULT_SYSTEM_PROMPT_TEMPLATE;
 
   return basePrompt
     .replace('{{DATETIME_BLOCK}}', datetimeBlock)
     .replace('{{WEATHER_BLOCK}}', weatherBlock)
-    .replace('{{MONTHS_BLOCK}}', monthsBlock);
+    .replace('{{MONTHS_BLOCK}}', monthsBlock)
+    .replace('{{DISTANCES_BLOCK}}', distancesBlock)
+    .replace('{{SEASONS_BLOCK}}', seasonsBlock)
+    .replace('{{YEAR_BLOCK}}', yearBlock)
+    .replace(/\{\{YEAR\}\}/g, String(dt.year));
 }
 
 // ==================== RATE LIMIT ====================
@@ -315,18 +410,13 @@ function getCorsHeaders(origin) {
 // ==================== ВЫЗОВ AI ====================
 async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
   try {
-    // Собираем динамический системный промпт с датой/погодой
     const dynamicPrompt = await buildSystemPrompt(systemPrompt, {
       city: options.city || 'Moscow',
       timezone: options.timezone || 'Europe/Moscow'
     });
 
     const messages = [];
-
-    messages.push({
-      role: 'system',
-      content: String(dynamicPrompt)
-    });
+    messages.push({ role: 'system', content: String(dynamicPrompt) });
 
     for (let i = 0; i < userMessages.length; i++) {
       const m = userMessages[i];
@@ -362,32 +452,19 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
         let waitTime = 30;
         try {
           const errData = JSON.parse(responseText);
-          if (errData.estimated_time) {
-            waitTime = Math.ceil(errData.estimated_time);
-          }
+          if (errData.estimated_time) waitTime = Math.ceil(errData.estimated_time);
         } catch (e) {}
-        return {
-          error: true,
-          message: 'Модель загружается, подождите ~' + waitTime + ' сек и повторите',
-          retryAfter: waitTime
-        };
+        return { error: true, message: 'Модель загружается, подождите ~' + waitTime + ' сек', retryAfter: waitTime };
       }
-      return {
-        error: true,
-        message: 'Ошибка провайдера (' + res.status + ')',
-        detail: responseText.substring(0, 500)
-      };
+      return { error: true, message: 'Ошибка провайдера (' + res.status + ')', detail: responseText.substring(0, 500) };
     }
 
     let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
+    try { data = JSON.parse(responseText); } catch (e) {
       return { error: true, message: 'Ошибка парсинга JSON ответа' };
     }
 
     let content = '';
-
     if (data.choices && data.choices[0] && data.choices[0].message) {
       content = data.choices[0].message.content;
     } else if (Array.isArray(data) && data[0] && data[0].generated_text) {
@@ -403,39 +480,21 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
 
     while (finishReason === 'length' && attempts < 3) {
       attempts++;
-
       const continueMessages = [...messages];
       continueMessages.push({ role: 'assistant', content: content });
-      continueMessages.push({
-        role: 'user',
-        content: 'Код обрезался. Продолжи ТОЧНО с места обрыва. НЕ повторяй написанное.'
-      });
+      continueMessages.push({ role: 'user', content: 'Ответ обрезался. Продолжи ТОЧНО с места обрыва. НЕ повторяй написанное.' });
 
       const contRes = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + apiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: continueMessages,
-          max_tokens: 8192,
-          temperature: 0.2,
-          top_p: 0.9,
-          stream: false
-        })
+        headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: MODEL, messages: continueMessages, max_tokens: 8192, temperature: 0.2, top_p: 0.9, stream: false })
       });
 
       if (!contRes.ok) break;
-
       let contData;
-      try {
-        contData = JSON.parse(await contRes.text());
-      } catch (e) { break; }
+      try { contData = JSON.parse(await contRes.text()); } catch (e) { break; }
 
-      const contContent = contData.choices && contData.choices[0] &&
-                          contData.choices[0].message && contData.choices[0].message.content;
+      const contContent = contData.choices && contData.choices[0] && contData.choices[0].message && contData.choices[0].message.content;
       if (!contContent || contContent.trim() === '') break;
 
       content += '\n' + contContent;
@@ -443,7 +502,6 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
     }
 
     return { success: true, content };
-
   } catch (e) {
     return { error: true, message: 'Ошибка соединения: ' + e.message };
   }
