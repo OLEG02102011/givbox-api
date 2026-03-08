@@ -1,4 +1,3 @@
-// by GIV BOX AI
 const API_URL = 'https://api.siliconflow.com/v1/chat/completions';
 const MODEL = 'tencent/Hunyuan-MT-7B';
 
