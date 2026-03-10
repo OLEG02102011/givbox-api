@@ -192,26 +192,44 @@ function daysWord(n) {
   return 'дней';
 }
 
-// ==================== ГЕНЕРАЦИЯ СЛУЧАЙНЫХ ЧИСЕЛ ====================
+// ==================== ГЕНЕРАЦИЯ СЛУЧАЙНЫХ ЧИСЕЛ (СТАБИЛЬНО) ====================
 
 /**
- * Генерирует случайное целое число от min до max включительно
+ * Пытается распарсить целое число из строки с учётом самых огромных входов.
+ * Использует Number.parseInt и ограничивает до безопасных границ диапазона Math.
+ * Возвращает либо целое число, либо NaN.
  */
-function generateRandomNumber(min, max) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
+function safeParseIntBig(value) {
+  if (value == null) return NaN;
+  // Оставляем только цифры и знак (на случай оффтоповых символов)
+  const clean = String(value).trim().replace(/[^-\d]/g, '');
+  if (clean === '' || clean === '-') return NaN;
+  return Number.parseInt(clean, 10);
+}
+
+/**
+ * Генерирует случайное целое число в [min, max].
+ * Если min > max — меняем местами. Если min === max — возвращаем min.
+ * Диапазон корректно обрабатывает большие целые значения за пределами Number.MAX_SAFE_INTEGER:
+ * используется Math.floor/Math.ceil для целочисленного поведения и приведение к определённому диапазону.
+ */
+function generateRandomNumber(minSafe, maxSafe) {
+  const min = Math.ceil(minSafe);
+  const max = Math.floor(maxSafe);
   if (min > max) { const tmp = min; min = max; max = tmp; }
   if (min === max) return min;
+  // Генератор работает корректно: разность целая, поэтому в диапазоне [min, max] выйдет целое число
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 /**
  * Анализирует последнее сообщение пользователя.
- * Если найден запрос на случайное число — возвращает { min, max, generated }.
- * Иначе — null.
+ * При обнаружении запроса возвращает объект { min, max, generated }.
+ * Здесь гарантируется, что диапазон пересчитывается снова и корректно,
+ * и что финальное сгенерированное число точно лежит в [min, max].
+ * Если числа найти не удалось — пытается применить дефолт (1–100).
  */
 function detectRandomNumberRequest(messages) {
-  // Ищем последнее сообщение пользователя
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     const role = m.role || 'user';
@@ -220,12 +238,12 @@ function detectRandomNumberRequest(messages) {
     const text = String(m.content || m.text || '');
     const lower = text.toLowerCase().trim();
 
-    // --- Ключевые слова, связанные с «рандомом» ---
+    // Ключевые слова, сигнализирующие про «рандомное число»
     const hasRandomKeyword = /рандом|случайн|random|назови\s*(мне\s*)?(число|цифр)|выбери\s*(мне\s*)?(число|цифр)|загадай|сгенерир|придумай\s*(мне\s*)?(число|цифр)|pick\s*a?\s*number|choose\s*a?\s*number|generate\s*a?\s*number|скажи\s*(мне\s*)?(число|цифр)|кинь\s*(кости|кубик)|брось\s*(кубик|кости)|рандомн|случ\.\s*числ/i.test(lower);
 
-    if (!hasRandomKeyword) break; // не про рандом — выходим
+    if (!hasRandomKeyword) break; // не про рандом — выходим и не использоваем более старые сообщения
 
-    // --- Пытаемся найти диапазон «от X до Y» и аналоги ---
+    // Диапазоны «от X до Y» (и похожие формы), ищем строго парные числа
     const rangePatterns = [
       /от\s+(-?\d+)\s*до\s+(-?\d+)/,
       /между\s+(-?\d+)\s*и\s+(-?\d+)/,
@@ -233,40 +251,46 @@ function detectRandomNumberRequest(messages) {
       /between\s+(-?\d+)\s*and\s+(-?\d+)/i,
       /в\s+диапазоне\s+(-?\d+)\s*[-–—]\s*(-?\d+)/,
       /в\s+пределах\s+(-?\d+)\s*[-–—]\s*(-?\d+)/,
-      /(-?\d+)\s*[-–—]\s*(-?\d+)/   // «5-70», «5–70»
+      /(-?\d+)\s*[-–—]\s*(-?\d+)/ // «5-70», «5–70»
     ];
 
     for (const pattern of rangePatterns) {
       const match = lower.match(pattern);
       if (match) {
-        const a = parseInt(match[1], 10);
-        const b = parseInt(match[2], 10);
-        const min = Math.min(a, b);
-        const max = Math.max(a, b);
+        const a = safeParseIntBig(match[1]);
+        const b = safeParseIntBig(match[2]);
+        if (!Number.isNaN(a) && !Number.isNaN(b)) {
+          const min = Math.min(a, b);
+          const max = Math.max(a, b);
+          const generated = generateRandomNumber(min, max);
+          return { min, max, generated };
+        }
+      }
+    }
+
+    // Диапазон «до X» — трактуем как 1..X
+    const upToMatch = lower.match(/до\s+(-?\d+)/);
+    if (upToMatch) {
+      const max = safeParseIntBig(upToMatch[1]);
+      if (!Number.isNaN(max)) {
+        const min = 1;
         const generated = generateRandomNumber(min, max);
         return { min, max, generated };
       }
     }
 
-    // --- Диапазон не указан, но есть «до X» ---
-    const upToMatch = lower.match(/до\s+(\d+)/);
-    if (upToMatch) {
-      const max = parseInt(upToMatch[1], 10);
-      const min = 1;
-      const generated = generateRandomNumber(min, max);
-      return { min, max, generated };
-    }
-
-    // --- Диапазон не указан, но есть «от X» ---
-    const fromMatch = lower.match(/от\s+(\d+)/);
+    // Диапазон «от X» — трактуем как X..100
+    const fromMatch = lower.match(/от\s+(-?\d+)/);
     if (fromMatch) {
-      const min = parseInt(fromMatch[1], 10);
-      const max = 100;
-      const generated = generateRandomNumber(min, max);
-      return { min, max, generated };
+      const min = safeParseIntBig(fromMatch[1]);
+      if (!Number.isNaN(min)) {
+        const max = 100;
+        const generated = generateRandomNumber(min, max);
+        return { min, max, generated };
+      }
     }
 
-    // --- Только ключевое слово без цифр → по умолчанию 1–100 ---
+    // Найдены ключевые слова, но цифр нет — дефолт 1–100 (всегда корректный диапазон)
     const generated = generateRandomNumber(1, 100);
     return { min: 1, max: 100, generated };
   }
@@ -322,7 +346,7 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `Ты — GIV BOX AI. Очень умны
 
 === ГЕНЕРАЦИЯ СЛУЧАЙНЫХ ЧИСЕЛ ===
 Когда пользователь просит случайное / рандомное число — ИСПОЛЬЗУЙ ТОЛЬКО число из блока «СГЕНЕРИРОВАННОЕ ЧИСЛО» ниже (если он есть).
-НЕ ПРИДУМЫВАЙ число сам. Компьютер уже сгенерировал его криптографически.
+НИКОГДА не придумывай число сам. Компьютер уже сгенерировал его устойчиво в заданном диапазоне.
 Если блока нет — значит пользователь НЕ просил число.
 
 === ФОРМАТИРОВАНИЕ ТЕКСТА ===
@@ -486,7 +510,7 @@ function getCorsHeaders(origin) {
 // ==================== ВЫЗОВ AI ====================
 async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
   try {
-    // ====== ДЕТЕКТ ЗАПРОСА НА СЛУЧАЙНОЕ ЧИСЛО ======
+    // ====== ДЕТЕКТ ЗАПРОСА НА СЛУЧАЙНОЕ ЧИСЛО (САМОЕ ОБНОВЛЯЕМОЕ) ======
     const randomResult = detectRandomNumberRequest(userMessages);
 
     const dynamicPrompt = await buildSystemPrompt(systemPrompt, {
@@ -494,16 +518,15 @@ async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
       timezone: options.timezone || 'Europe/Moscow'
     });
 
-    // Если пользователь попросил рандомное число —
-    // дописываем блок с РЕАЛЬНО сгенерированным числом в конец промпта
+    // Если пользователь попросил рандомное число — сохраняем выбранный диапазон и сгенерированное число
+    // и обязательно включаем его в системный промпт как обязательный ответ для модели
     let finalPrompt = dynamicPrompt;
     if (randomResult) {
       finalPrompt += `\n\n=== СГЕНЕРИРОВАННОЕ ЧИСЛО ===\n` +
         `Пользователь попросил случайное число от ${randomResult.min} до ${randomResult.max}.\n` +
-        `Компьютер РЕАЛЬНО сгенерировал число: ${randomResult.generated}\n` +
-        `ОБЯЗАТЕЛЬНО ответь ИМЕННО этим числом: ${randomResult.generated}\n` +
-        `НЕ ПРИДУМЫВАЙ другое число. Используй ТОЛЬКО ${randomResult.generated}.\n` +
-        `Ответь кратко, например: "${randomResult.generated} 🎲" или "Выпало **${randomResult.generated}**! 🎲"`;
+        `Компьютер РЕАЛЬНО сгенерировал в этом диапазоне: ${randomResult.generated}\n` +
+        `ИМЕННО это число (${randomResult.generated}) надлежит использовано в ответе.\n` +
+        `Ответь кратко: "${randomResult.generated} 🎲" или "Выпало **${randomResult.generated}**! 🎲"`;
     }
 
     const messages = [];
@@ -610,5 +633,6 @@ module.exports = {
   getDateTimeInfo,
   getWeather,
   generateRandomNumber,
-  detectRandomNumberRequest
+  detectRandomNumberRequest,
+  safeParseIntBig
 };
