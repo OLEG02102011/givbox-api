@@ -57,7 +57,6 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
     'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
   ];
 
-  // Сколько дней в каждом месяце текущего года
   const allMonthsDays = [];
   for (let m = 1; m <= 12; m++) {
     const d = new Date(year, m, 0).getDate();
@@ -67,14 +66,12 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
   const daysInCurrentMonth = new Date(year, month, 0).getDate();
   const daysLeftInMonth = daysInCurrentMonth - day;
 
-  // === Функция подсчёта разницы в днях ===
   function daysBetween(y1, m1, d1, y2, m2, d2) {
     const a = new Date(y1, m1 - 1, d1);
     const b = new Date(y2, m2 - 1, d2);
     return Math.round((b - a) / 86400000);
   }
 
-  // === Дни до начала каждого будущего месяца ===
   const daysUntilMonths = [];
   for (let m = 1; m <= 12; m++) {
     let targetYear = year;
@@ -92,7 +89,6 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
     });
   }
 
-  // === Дни до сезонов ===
   const seasons = [
     { name: 'весны', startMonth: 3, startDay: 1 },
     { name: 'лета', startMonth: 6, startDay: 1 },
@@ -115,17 +111,14 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
     });
   }
 
-  // === Текущий сезон ===
   let currentSeason;
   if (month >= 3 && month <= 5) currentSeason = 'весна';
   else if (month >= 6 && month <= 8) currentSeason = 'лето';
   else if (month >= 9 && month <= 11) currentSeason = 'осень';
   else currentSeason = 'зима';
 
-  // === Дни до Нового года ===
   const daysUntilNewYear = daysBetween(year, month, day, year + 1, 1, 1);
 
-  // === День в году / всего дней в году ===
   const startOfYear = new Date(year, 0, 1);
   const todayDate = new Date(year, month - 1, day);
   const dayOfYear = Math.round((todayDate - startOfYear) / 86400000) + 1;
@@ -133,7 +126,6 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
   const totalDaysInYear = isLeapYear ? 366 : 365;
   const daysLeftInYear = totalDaysInYear - dayOfYear;
 
-  // === Время суток ===
   let timeOfDay;
   if (hour >= 5 && hour < 12) timeOfDay = 'утро';
   else if (hour >= 12 && hour < 17) timeOfDay = 'день';
@@ -143,26 +135,13 @@ function getDateTimeInfo(timezone = 'Europe/Moscow') {
   return {
     dateFormatted: dateFormatter.format(now),
     timeFormatted: timeFormatter.format(now),
-    year,
-    month,
-    day,
-    hour,
-    minute,
-    timeOfDay,
-    currentSeason,
-    isLeapYear,
+    year, month, day, hour, minute,
+    timeOfDay, currentSeason, isLeapYear,
     currentMonthName: monthNamesIm[month - 1],
     currentMonthNameRod: monthNamesRod[month - 1],
-    daysInCurrentMonth,
-    daysLeftInMonth,
-    allMonthsDays,
-    daysUntilMonths,
-    daysUntilSeasons,
-    daysUntilNewYear,
-    dayOfYear,
-    totalDaysInYear,
-    daysLeftInYear,
-    timezone
+    daysInCurrentMonth, daysLeftInMonth, allMonthsDays,
+    daysUntilMonths, daysUntilSeasons, daysUntilNewYear,
+    dayOfYear, totalDaysInYear, daysLeftInYear, timezone
   };
 }
 
@@ -213,7 +192,93 @@ function daysWord(n) {
   return 'дней';
 }
 
+// ==================== ГЕНЕРАЦИЯ СЛУЧАЙНЫХ ЧИСЕЛ ====================
+
+/**
+ * Генерирует случайное целое число от min до max включительно
+ */
+function generateRandomNumber(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  if (min > max) { const tmp = min; min = max; max = tmp; }
+  if (min === max) return min;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * Анализирует последнее сообщение пользователя.
+ * Если найден запрос на случайное число — возвращает { min, max, generated }.
+ * Иначе — null.
+ */
+function detectRandomNumberRequest(messages) {
+  // Ищем последнее сообщение пользователя
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    const role = m.role || 'user';
+    if (role !== 'user') continue;
+
+    const text = String(m.content || m.text || '');
+    const lower = text.toLowerCase().trim();
+
+    // --- Ключевые слова, связанные с «рандомом» ---
+    const hasRandomKeyword = /рандом|случайн|random|назови\s*(мне\s*)?(число|цифр)|выбери\s*(мне\s*)?(число|цифр)|загадай|сгенерир|придумай\s*(мне\s*)?(число|цифр)|pick\s*a?\s*number|choose\s*a?\s*number|generate\s*a?\s*number|скажи\s*(мне\s*)?(число|цифр)|кинь\s*(кости|кубик)|брось\s*(кубик|кости)|рандомн|случ\.\s*числ/i.test(lower);
+
+    if (!hasRandomKeyword) break; // не про рандом — выходим
+
+    // --- Пытаемся найти диапазон «от X до Y» и аналоги ---
+    const rangePatterns = [
+      /от\s+(-?\d+)\s*до\s+(-?\d+)/,
+      /между\s+(-?\d+)\s*и\s+(-?\d+)/,
+      /from\s+(-?\d+)\s*to\s+(-?\d+)/i,
+      /between\s+(-?\d+)\s*and\s+(-?\d+)/i,
+      /в\s+диапазоне\s+(-?\d+)\s*[-–—]\s*(-?\d+)/,
+      /в\s+пределах\s+(-?\d+)\s*[-–—]\s*(-?\d+)/,
+      /(-?\d+)\s*[-–—]\s*(-?\d+)/   // «5-70», «5–70»
+    ];
+
+    for (const pattern of rangePatterns) {
+      const match = lower.match(pattern);
+      if (match) {
+        const a = parseInt(match[1], 10);
+        const b = parseInt(match[2], 10);
+        const min = Math.min(a, b);
+        const max = Math.max(a, b);
+        const generated = generateRandomNumber(min, max);
+        return { min, max, generated };
+      }
+    }
+
+    // --- Диапазон не указан, но есть «до X» ---
+    const upToMatch = lower.match(/до\s+(\d+)/);
+    if (upToMatch) {
+      const max = parseInt(upToMatch[1], 10);
+      const min = 1;
+      const generated = generateRandomNumber(min, max);
+      return { min, max, generated };
+    }
+
+    // --- Диапазон не указан, но есть «от X» ---
+    const fromMatch = lower.match(/от\s+(\d+)/);
+    if (fromMatch) {
+      const min = parseInt(fromMatch[1], 10);
+      const max = 100;
+      const generated = generateRandomNumber(min, max);
+      return { min, max, generated };
+    }
+
+    // --- Только ключевое слово без цифр → по умолчанию 1–100 ---
+    const generated = generateRandomNumber(1, 100);
+    return { min: 1, max: 100, generated };
+  }
+
+  return null;
+}
+
+// ==================== СИСТЕМНЫЙ ПРОМПТ ====================
+
 const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `Ты — GIV BOX AI. Очень умный, полезный и внимательный помощник.
+
+Если вдруг спросят, кто тебя создал или кто тебя создала (и другие похожие слова) то ответь то создал меня группа игр GIV BOX
 
 САМОЕ ГЛАВНОЕ:
 1. НИКОГДА не придумывай факты и не выдумывай определения несуществующих слов.
@@ -254,6 +319,11 @@ const DEFAULT_SYSTEM_PROMPT_TEMPLATE = `Ты — GIV BOX AI. Очень умны
 - Если спрашивают «сколько дней до лета» — найди строку «До лета» выше и скажи число оттуда.
 - Если спрашивают «сколько дней в мае» — найди строку «Май» в календаре выше.
 - НЕ ОКРУГЛЯЙ, НЕ ИСПРАВЛЯЙ эти числа. Они точные.
+
+=== ГЕНЕРАЦИЯ СЛУЧАЙНЫХ ЧИСЕЛ ===
+Когда пользователь просит случайное / рандомное число — ИСПОЛЬЗУЙ ТОЛЬКО число из блока «СГЕНЕРИРОВАННОЕ ЧИСЛО» ниже (если он есть).
+НЕ ПРИДУМЫВАЙ число сам. Компьютер уже сгенерировал его криптографически.
+Если блока нет — значит пользователь НЕ просил число.
 
 === ФОРМАТИРОВАНИЕ ТЕКСТА ===
 
@@ -304,7 +374,6 @@ async function buildSystemPrompt(customPrompt, options = {}) {
   const dt = getDateTimeInfo(timezone);
   const weather = await getWeather(city);
 
-  // --- Блок даты/времени ---
   const datetimeBlock = [
     `Сегодня: ${dt.dateFormatted}`,
     `Точная дата: ${dt.day} ${dt.currentMonthNameRod} ${dt.year} года`,
@@ -316,7 +385,6 @@ async function buildSystemPrompt(customPrompt, options = {}) {
     `Сегодня ${dt.day}-й день месяца, осталось ${dt.daysLeftInMonth} ${daysWord(dt.daysLeftInMonth)} до конца ${dt.currentMonthNameRod}`
   ].join('\n');
 
-  // --- Блок погоды ---
   let weatherBlock;
   if (weather) {
     weatherBlock = [
@@ -330,12 +398,10 @@ async function buildSystemPrompt(customPrompt, options = {}) {
     weatherBlock = 'Данные о погоде временно недоступны. Если спросят — скажи что не удалось получить данные.';
   }
 
-  // --- Блок месяцев ---
   const monthsBlock = dt.allMonthsDays
     .map(m => `- ${m.name.charAt(0).toUpperCase() + m.name.slice(1)} ${dt.year}: ${m.days} ${daysWord(m.days)}`)
     .join('\n');
 
-  // --- Блок предвычисленных расстояний ---
   const distanceLines = [];
   distanceLines.push(`Сегодня: ${dt.day} ${dt.currentMonthNameRod} ${dt.year}`);
   distanceLines.push('');
@@ -353,7 +419,6 @@ async function buildSystemPrompt(customPrompt, options = {}) {
   distanceLines.push(`До Нового ${dt.year + 1} года: ${dt.daysUntilNewYear} ${daysWord(dt.daysUntilNewYear)}`);
   const distancesBlock = distanceLines.join('\n');
 
-  // --- Блок сезонов ---
   const seasonsBlock = [
     `Сейчас: ${dt.currentSeason} ${dt.year}`,
     `Весна: март, апрель, май`,
@@ -362,7 +427,6 @@ async function buildSystemPrompt(customPrompt, options = {}) {
     `Зима: декабрь, январь, февраль`
   ].join('\n');
 
-  // --- Блок года ---
   const yearBlock = [
     `Текущий год: ${dt.year}`,
     `Високосный: ${dt.isLeapYear ? 'да' : 'нет'}`,
@@ -371,7 +435,6 @@ async function buildSystemPrompt(customPrompt, options = {}) {
     `Осталось дней в году: ${dt.daysLeftInYear}`
   ].join('\n');
 
-  // --- Подстановка ---
   const basePrompt = customPrompt || DEFAULT_SYSTEM_PROMPT_TEMPLATE;
 
   return basePrompt
@@ -423,13 +486,28 @@ function getCorsHeaders(origin) {
 // ==================== ВЫЗОВ AI ====================
 async function callAI(apiKey, userMessages, systemPrompt, options = {}) {
   try {
+    // ====== ДЕТЕКТ ЗАПРОСА НА СЛУЧАЙНОЕ ЧИСЛО ======
+    const randomResult = detectRandomNumberRequest(userMessages);
+
     const dynamicPrompt = await buildSystemPrompt(systemPrompt, {
       city: options.city || 'Moscow',
       timezone: options.timezone || 'Europe/Moscow'
     });
 
+    // Если пользователь попросил рандомное число —
+    // дописываем блок с РЕАЛЬНО сгенерированным числом в конец промпта
+    let finalPrompt = dynamicPrompt;
+    if (randomResult) {
+      finalPrompt += `\n\n=== СГЕНЕРИРОВАННОЕ ЧИСЛО ===\n` +
+        `Пользователь попросил случайное число от ${randomResult.min} до ${randomResult.max}.\n` +
+        `Компьютер РЕАЛЬНО сгенерировал число: ${randomResult.generated}\n` +
+        `ОБЯЗАТЕЛЬНО ответь ИМЕННО этим числом: ${randomResult.generated}\n` +
+        `НЕ ПРИДУМЫВАЙ другое число. Используй ТОЛЬКО ${randomResult.generated}.\n` +
+        `Ответь кратко, например: "${randomResult.generated} 🎲" или "Выпало **${randomResult.generated}**! 🎲"`;
+    }
+
     const messages = [];
-    messages.push({ role: 'system', content: String(dynamicPrompt) });
+    messages.push({ role: 'system', content: String(finalPrompt) });
 
     for (let i = 0; i < userMessages.length; i++) {
       const m = userMessages[i];
@@ -530,5 +608,7 @@ module.exports = {
   callAI,
   buildSystemPrompt,
   getDateTimeInfo,
-  getWeather
+  getWeather,
+  generateRandomNumber,
+  detectRandomNumberRequest
 };
