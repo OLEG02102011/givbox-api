@@ -1,5 +1,5 @@
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'openrouter/free';
+const MODEL = 'stepfun/step-3.5-flash:free';
 
 const ALLOWED_ORIGINS = [
   'https://givboxai.pages.dev',
