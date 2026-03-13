@@ -1,5 +1,5 @@
 const API_URL = 'https://api.poe.com/v1/chat/completions';
-const MODEL = 'deepseek-r1';
+const MODEL = 'qwen3-next-80b';
 
 const ALLOWED_ORIGINS = [
   'https://givboxai.pages.dev',
