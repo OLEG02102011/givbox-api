@@ -1,5 +1,5 @@
-const API_URL = 'https://api.poe.com/v1/chat/completions';
-const MODEL = 'qwen/qwen3-235b';
+const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const MODEL = 'openrouter/free';
 
 const ALLOWED_ORIGINS = [
   'https://givboxai.pages.dev',
